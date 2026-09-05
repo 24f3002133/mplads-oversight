@@ -1,0 +1,17 @@
+/* The app's own rules from the canvas <helmet> block (mp-glow, mp-rec). */
+
+@keyframes mp-ping { 0% { transform: scale(1); opacity: 0.6; } 75%,100% { transform: scale(2.4); opacity: 0; } }
+  @keyframes mp-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @keyframes mp-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  * { box-sizing: border-box; }
+  body { margin:0; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility; }
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-thumb { background:#D6DCD3; border-radius:4px; }
+  a { color:#1b3a6c; }
+  a:hover { color:#142c52; }
+  .mp-glow { transition: transform .16s ease, box-shadow .16s ease, filter .16s ease; }
+  .mp-glow:hover { transform: translateY(-1px); box-shadow: 0 0 0 1px currentColor, 0 0 16px -4px currentColor; filter: brightness(1.08); }
+  .mp-glow:active { transform: translateY(0); }
+  @keyframes mp-rec { 0%,100% { box-shadow:0 0 0 0 currentColor; } 50% { box-shadow:0 0 0 5px transparent; } }
+  .mp-rec { animation: mp-rec 1.2s ease-in-out infinite; }
+  input:focus, select:focus, textarea:focus, button:focus { outline: 2px solid #1b3a6c; outline-offset:1px; }

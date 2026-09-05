@@ -1,0 +1,22 @@
+{
+  "name": "mplads-oversight",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node tools/prerender.mjs",
+    "preview": "vite preview",
+    "unbundle": "node tools/unbundle.mjs",
+    "convert": "node tools/optimize-assets.mjs && node tools/jsxify.mjs && node tools/split-logic.mjs && node tools/subset-fonts.mjs && node tools/subset-glyphs.mjs",
+    "optimize": "node tools/optimize-assets.mjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.0"
+  }
+}
