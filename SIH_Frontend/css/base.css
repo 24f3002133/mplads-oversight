@@ -1,0 +1,13 @@
+/* Reset carried over from the canvas export's pre-boot <style>. */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--page-bg);
+  color: var(--text-primary);
+  min-height: 100vh;
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+img { max-width: 100%; }

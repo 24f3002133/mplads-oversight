@@ -1,0 +1,84 @@
+/* Theme tokens.
+ *
+ * AppState.syncTheme() overwrites these on :root at runtime (it also handles
+ * settingsDarkIntensity, which scales the dark surfaces). The values here are
+ * the pre-hydration fallback, so the first paint is not unstyled — they mirror
+ * the light/dark palettes in js/data/mock.js and the T block in AppState. */
+
+:root {
+  --page-bg: #E6E9E3;
+  --sidebar-bg: #F7F9F5;
+  --sidebar-border: #D4DAD2;
+  --card-bg: #ffffff;
+  --border-color: #D6DCD3;
+
+  --text-primary: #131A22;
+  --text-secondary: #4A555F;
+  --text-muted: #6C7780;
+  --heading-color: #131A22;
+  --body-color: #131A22;
+
+  --surface-muted: #E7EAE4;
+  --surface-active: #E1E7DE;
+  --surface-subtle: #F7F8F5;
+  --sector-badge-bg: #E1E7F0;
+
+  --map-bg: #FBFAF6;
+  --map-muted: #E9E2CE;
+
+  --primary: #1b3a6b;
+  --primary-fg: #FAFBF9;
+
+  --risk-high: #b4213d;
+  --risk-med: #9a6a0e;
+  --risk-clear: #1f6a4c;
+  --risk-high-wash: rgb(245, 224, 228);
+  --risk-med-wash: rgb(241, 234, 221);
+  --risk-clear-wash: rgb(224, 234, 230);
+
+  --copilot-accent: #0E7C6B;
+  --copilot-accent-line: rgba(14, 124, 107, 0.35);
+  --copilot-accent-fg: #FFFFFF;
+  --copilot-header-bg: rgba(14, 124, 107, 0.07);
+  --copilot-chip-bg: rgba(14, 124, 107, 0.05);
+
+  --cell-pad: 10px 16px;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #10192A;
+  --sidebar-bg: #0E1626;
+  --sidebar-border: #2A3D5F;
+  --card-bg: #16223A;
+  --border-color: #28395A;
+
+  --text-primary: #E8ECF3;
+  --text-secondary: #A9B6C9;
+  --text-muted: #8E9CB2;
+  --heading-color: #EFDCB0;
+  --body-color: #E7E2D6;
+
+  --surface-muted: #1D2A42;
+  --surface-active: #223351;
+  --surface-subtle: #16223A;
+  --sector-badge-bg: #1F3050;
+
+  --map-bg: #0F1B2D;
+  --map-muted: #1D2A42;
+
+  --primary: #5B8DEF;
+  --primary-fg: #FAFBF9;
+
+  --risk-high: #E0637B;
+  --risk-med: #E3B341;
+  --risk-clear: #3FBE8E;
+  --risk-high-wash: rgb(74, 46, 66);
+  --risk-med-wash: rgb(75, 69, 50);
+  --risk-clear-wash: rgb(29, 72, 71);
+
+  --copilot-accent: #2DE8C8;
+  --copilot-accent-line: rgba(45, 232, 200, 0.45);
+  --copilot-accent-fg: #06231D;
+  --copilot-header-bg: rgba(45, 232, 200, 0.10);
+  --copilot-chip-bg: rgba(45, 232, 200, 0.07);
+}
