@@ -1,2 +1,10 @@
 .env
 .vscode
+
+SIH_Frontend/node_modules/
+SIH_Frontend/dist/
+
+# Intermediate output of SIH_Frontend/tools/unbundle.mjs; regenerate with `npm run unbundle`.
+# SIH_Frontend/assets/ is NOT ignored — it is committed so a fresh clone runs without
+# needing the original 15 MB canvas export.
+SIH_Frontend/extracted/

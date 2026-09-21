@@ -21,7 +21,6 @@ import {
   agencyLedger,
   AGENCY_IDLE,
   REPORTS,
-  LIVE_EVENTS,
   money,
   SEAL_DATE_LABEL,
   ALL,
@@ -32,6 +31,7 @@ import {
   REG_DISTRICTS,
   MOCK_EMAILS,
 } from '../data/mock.js';
+import { fetchOverview } from '../api.js';
 
 let INDIA_STATE_PATHS = null, INDIA_MAP_W = 520, INDIA_MAP_H = 560;
 
@@ -50,16 +50,20 @@ export default class AppState extends React.Component {
     settingsIncludeAnnexures: true,
     paletteOpen: false, paletteQuery: '',
     copilotOpen: false, copilotMessages: [], copilotDraft: '', listening: false,
-    tickerIndex: 0, tickerSeconds: 0, tickerFlash: false, tickerCount: 214,
+    tickerSeconds: 0,
     overviewSortKey: 'flagged',
     districtModalStateId: null,
     workModalId: null, workModalNote: '', workModalSavedAt: null, workModalDecision: null,
     allworksQuery: '', allworksSector: ALL, allworksStatus: ALL, allworksCheckType: ALL, allworksPage: 1,
     queueTab: 'awaiting', reportGeneratingId: null, toast: null, trackedIds: [],
     loginError: null, regToastMsg: null,
+    overviewLive: null,
   };
 
   componentDidMount() {
+    fetchOverview()
+      .then((overviewLive) => this.setState({overviewLive}))
+      .catch(() => {});  // API down: the overview falls back to mock.js
     this.syncTheme(this._vals ?? {});
     if (this.state.route === 'app') this._loadIndiaMap();
     try {
@@ -72,10 +76,6 @@ export default class AppState extends React.Component {
       const tr = window.localStorage.getItem('mplads.tracked');
       if (tr) this.setState({trackedIds: JSON.parse(tr)});
     } catch(e) {}
-    this._tickRotate = setInterval(() => {
-      this.setState((s) => ({ tickerIndex:(s.tickerIndex+1)%LIVE_EVENTS.length, tickerSeconds:0, tickerFlash:true, tickerCount:s.tickerCount+1 }));
-      setTimeout(() => this.setState({tickerFlash:false}), 900);
-    }, 7000);
     this._tickClock = setInterval(() => this.setState((s) => ({tickerSeconds:s.tickerSeconds+1})), 1000);
     this._onKeyDown = (e) => { if (e.key==='k' && (e.metaKey||e.ctrlKey)) { e.preventDefault(); this.setState((s) => ({paletteOpen:!s.paletteOpen})); } };
     document.addEventListener('keydown', this._onKeyDown);
@@ -86,7 +86,7 @@ export default class AppState extends React.Component {
   }
 
   componentWillUnmount() {
-    clearInterval(this._tickRotate); clearInterval(this._tickClock);
+    clearInterval(this._tickClock);
     document.removeEventListener('keydown', this._onKeyDown);
     if (this._noteTimer) clearTimeout(this._noteTimer);
   }
@@ -416,13 +416,17 @@ export default class AppState extends React.Component {
     const resolvedAll = WORKS.filter((w) => RESOLVED_STATUSES.includes(w.status));
     const queueActive = s.screen==='queue';
 
-    const tickerMarqueeHtml = LIVE_EVENTS.map((e) => e.text).join(' &nbsp;•&nbsp; ');
+    // Overview reads from the API once it answers; everything else is still mock.
+    const live = s.overviewLive;
+    const ovStates = live ? live.states : STATES;
+    const ovChecks = live ? live.checkCounts : CHECK_TYPE_COUNTS;
 
-    const totalMonitored = STATES.reduce((a,x) => a+x.monitored, 0);
-    const totalFlagged = STATES.reduce((a,x) => a+x.flagged, 0);
-    const avgRiskNat = Math.round(STATES.reduce((a,x) => a+x.avgRisk, 0)/STATES.length);
-    const totalSanctioned = WORKS.reduce((a,w) => a+w.sanctioned, 0);
-    const highRiskCount = WORKS.filter((w) => w.riskScore>=75).length;
+    const totalMonitored = ovStates.reduce((a,x) => a+x.monitored, 0);
+    const totalFlagged = ovStates.reduce((a,x) => a+x.flagged, 0);
+    const avgRiskNat = live ? Math.round(live.kpis.avg_national_risk_score)
+      : Math.round(STATES.reduce((a,x) => a+x.avgRisk, 0)/STATES.length);
+    const totalSanctioned = live ? live.kpis.total_funds_sanctioned : WORKS.reduce((a,w) => a+w.sanctioned, 0);
+    const highRiskCount = live ? live.kpis.high_risk_works : WORKS.filter((w) => w.riskScore>=75).length;
     const overviewStats = [
       {label:'Works monitored', value: totalMonitored.toLocaleString('en-IN'), color:T.text},
       {label:'Flagged for review', value: totalFlagged.toLocaleString('en-IN'), color:HIGH, sub:`${((totalFlagged/totalMonitored)*100).toFixed(1)}% of total`},
@@ -430,23 +434,24 @@ export default class AppState extends React.Component {
       {label:'Avg. national risk score', value:`${avgRiskNat}`, color:MED},
       {label:'Total funds sanctioned', value: money(totalSanctioned), color:T.text, sub:'across monitored works'},
     ];
-    const maxFlagged = Math.max(...STATES.map((x) => x.flagged));
+    const maxFlagged = Math.max(...ovStates.map((x) => x.flagged)) || 1;
     const mapReady = !!INDIA_STATE_PATHS;
-    const stateIds = new Set(STATES.map((x) => x.id));
-    const mapCells = mapReady ? STATES.filter((st) => INDIA_STATE_PATHS[st.id]).map((st) => {
+    const stateIds = new Set(ovStates.map((x) => x.id));
+    const mapCells = mapReady ? ovStates.filter((st) => INDIA_STATE_PATHS[st.id]).map((st) => {
       const t = st.flagged/maxFlagged;
       return { id:st.id, d: INDIA_STATE_PATHS[st.id], fill: hexMix(T.mapMuted, HIGH, t),
-        title:`${st.name} — ${st.flagged} flagged of ${st.monitored} monitored, avg risk ${st.avgRisk}`, open: this.openDistrictModal(st.id) };
+        title:`${st.name} — ${st.flagged} flagged of ${st.monitored} monitored, avg risk ${st.avgRisk}`,
+        open: live ? undefined : this.openDistrictModal(st.id) };
     }) : [];
     const mapOtherPaths = mapReady ? Object.keys(INDIA_STATE_PATHS).filter((id) => !stateIds.has(id)).map((id) => INDIA_STATE_PATHS[id]) : [];
     const legendCells = Array.from({length:12}, (_, i) => hexMix(T.mapMuted, HIGH, i/11));
-    const checkBars = Object.entries(CHECK_TYPE_COUNTS).map(([label,value]) => ({label,value})).sort((a,b) => b.value-a.value);
+    const checkBars = Object.entries(ovChecks).map(([label,value]) => ({label,value})).sort((a,b) => b.value-a.value);
     const maxBar = Math.max(...checkBars.map((b) => b.value));
     checkBars.forEach((b) => { b.pct = Math.max(3, (b.value/maxBar)*100); });
     const sortButtons = ['flagged','avgRisk','monitored'].map((key) => ({ key, go: this.setOverviewSort(key),
       label: key==='flagged'?'Flagged':key==='avgRisk'?'Avg. risk':'Monitored',
       bg: s.overviewSortKey===key?T.surfaceActive:'transparent', color:T.text }));
-    const sortedStates = [...STATES].sort((a,b) => b[s.overviewSortKey]-a[s.overviewSortKey]);
+    const sortedStates = [...ovStates].sort((a,b) => b[s.overviewSortKey]-a[s.overviewSortKey]);
     const sortedStateRows = sortedStates.map((st, i) => {
       const band = riskBand(st.avgRisk);
       const max = Math.max(...st.trend), min = Math.min(...st.trend), range = max-min||1;
@@ -455,7 +460,7 @@ export default class AppState extends React.Component {
       return { rank:i+1, name:st.name, monitored: st.monitored.toLocaleString('en-IN'), flagged: st.flagged.toLocaleString('en-IN'),
         riskBg: RISK_WASH[band], riskColor: RISK_COLORS[band], riskLabel: `${st.avgRisk} · ${RISK_LABEL[band]}`,
         sparkPoints: pts.join(' '), sparkColor: rising?HIGH:T.textMuted, sparkLastY: pts[pts.length-1].split(',')[1],
-        open: this.openDistrictModal(st.id) };
+        open: live ? undefined : this.openDistrictModal(st.id) };
     });
 
     const MONTHS = ['Feb','Mar','Apr','May','Jun','Jul','Aug'];
@@ -684,7 +689,7 @@ export default class AppState extends React.Component {
       showLogin, showRegister, showApp,
       primaryColor: PRI, primaryFg: PRI_FG, riskHighColor: HIGH, riskMedColor: MED, riskClearColor: CLEAR,
       riskHighWash: HIGH_WASH, riskMedWash: MED_WASH, riskClearWash: CLEAR_WASH, cellPad,
-      navItems, queueNavBg: queueActive ? HIGH_WASH : 'transparent', queueNavLabel: `${awaitingAll.length} awaiting your review`, gotoQueue: this.gotoQueue,
+      navItems, queueNavBg: queueActive ? HIGH_WASH : 'transparent', queueNavLabel: 'Review queue', gotoQueue: this.gotoQueue,
       sessionName: session.fullName, sessionRoleLine: `${session.role} · ${session.district}, ${session.state}`, sessionDistrict: session.district, sessionState: session.state,
       sessionRole: session.role, sessionInitials: (session.fullName||'').split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0,2).toUpperCase() || '—',
       isSettings: s.screen==='settings',
@@ -716,8 +721,10 @@ export default class AppState extends React.Component {
       notifyMediumBg: s.settingsNotifyMedium?T.surfaceActive:T.surfaceMuted, notifyMediumColor: s.settingsNotifyMedium?T.text:T.textSec, notifyMediumBorder: s.settingsNotifyMedium?T.textSec:T.border,
       handleLogout: this.handleLogout,
       sealDateLabel: SEAL_DATE_LABEL,
-      tickerMarqueeHtml: {__html: tickerMarqueeHtml}, tickerCount: s.tickerCount, tickerBg: s.tickerFlash ? HIGH_WASH : T.card,
-      tickerSyncedLabel: s.tickerSeconds===0 ? 'just now' : `${s.tickerSeconds}s ago`,
+      tickerSyncedLabel: s.tickerSeconds===0 ? 'just now' : `${s.tickerSeconds}s ago`,  // still-mock screens only
+      lastSyncedLabel: live && live.lastSyncedAt
+        ? new Date(live.lastSyncedAt).toLocaleString('en-IN', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})
+        : '—',
       canSwitchScope, showScopedBadge: !canSwitchScope,
       scopeChipDistrict: s.settingsDistrict, scopeChipState: s.settingsState,
       districtOptions: DISTRICT_OPTIONS, settingsStateOptions: STATES.map((x) => x.name),

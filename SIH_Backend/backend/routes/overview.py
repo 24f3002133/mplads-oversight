@@ -1,42 +1,35 @@
 from fastapi import APIRouter
-from schema import (
-    LiveStatus, WorkKPIs, CheckTypeBreakdown,
-    RankedStatesResponse, DistrictDrilldownResponse,
-    TrendPoint, DataQuality
-)
 
+import risk
+from schema import (
+    LiveStatus, WorkKPIs, CheckTypeBreakdown, RankedStatesResponse,
+)
 
 router = APIRouter()
 
 
-@router.get("/")
-def main_page():
-    return
-
-@router.get("/live-status")
+@router.get("/live-status", response_model=LiveStatus)
 def get_live_status():
-    return {
-        "last_synced_at": "",
-        "data_source": "eSAKSHI",
-        "works_count": 0,
-        "is_live": True
-    }
+    snap = risk.snapshot()
+    last_synced = snap["last_synced_at"]
+    return LiveStatus(
+        last_synced_at=last_synced.isoformat() if last_synced else "",
+        works_count=snap["kpis"]["works_monitored"],
+        is_live=last_synced is not None,
+    )
 
-@router.get("/work-data")
+
+@router.get("/work-data", response_model=WorkKPIs)
 def work_data():
-    return {
-        "works_monitored": 0,
-        "flagged_for_review": 0,
-        "high_risk_works": 0,
-        "avg_national_risk_score": 0.0,
-        "total_funds_sanctioned": 0.0
-    }
+    return WorkKPIs(**risk.snapshot()["kpis"])
 
-@router.get("/flag-check")
+
+@router.get("/flag-check", response_model=CheckTypeBreakdown)
 def flag_check():
-    return
+    return CheckTypeBreakdown(**risk.snapshot()["checks"])
 
-@router.get("/ranked-states")
+
+@router.get("/ranked-states", response_model=RankedStatesResponse)
 def ranked_states():
-    return
-
+    states = risk.snapshot()["states"]
+    return RankedStatesResponse(states=states, total_states=len(states))

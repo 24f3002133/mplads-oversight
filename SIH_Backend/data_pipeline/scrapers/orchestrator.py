@@ -26,6 +26,11 @@ HISTORY_INSERT = "INSERT INTO work_history (work_id, field_changed, old_value, n
 TRACKED_FIELDS = ["status", "sanction_amount", "recommended_amount", "actual_completion_amount", "sanctioned_date", "completion_date"]
 
 
+def clean_date(v):
+    # eSAKSHI sends the string "NA" for unsanctioned works, not null.
+    return None if v in (None, "", "NA") else v
+
+
 async def mp_names():
     lok_sabha_mps = await json_api_lok_sabha()
     rajya_sabha_mps = await json_api_rajya_sabha()
@@ -87,9 +92,9 @@ async def mp_project_data():
             "recommended_amount": w.get("RECOMMENDED_AMOUNT"),
             "sanction_amount": w.get("SANCTION_AMOUNT"),
             "actual_completion_amount": w.get("ACTUAL_AMOUNT"),
-            "recommended_date": w.get("RECOMMENDATION_DATE"),
-            "sanctioned_date": w.get("SANCTION_DATE"),
-            "completion_date": w.get("ACTUAL_END_DATE"),
+            "recommended_date": clean_date(w.get("RECOMMENDATION_DATE")),
+            "sanctioned_date": clean_date(w.get("SANCTION_DATE")),
+            "completion_date": clean_date(w.get("ACTUAL_END_DATE")),
         })
 
     # push to db with diff

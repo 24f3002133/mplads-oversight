@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routes import (
     overview, all_works, funds, contractor,
     tracker, reports, review_queue, dossier,
@@ -6,11 +7,16 @@ from routes import (
 )
 
 
-app = FastAPI()
-
 app = FastAPI(
     title="MPLADS Oversight API",
     description="AI-powered monitoring and anomaly detection for MPLADS scheme"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

@@ -6,10 +6,9 @@ CREATE TABLE IF NOT EXISTS project_directory (
     description TEXT,
     category VARCHAR(100),
     activity_name VARCHAR(255),
-    IDA_Name VARCHAR(255)
+    ida_name VARCHAR(255),
     district VARCHAR(150),
-    status ENUM('Pending for Sanction', 'Vendor Identification', 'Time Estimation', 
-            'Physical Inspection', 'Work partially Completed', 'Work Completed', 'NA') NOT NULL,
+    status VARCHAR(50),
     recommended_amount DECIMAL(14,2),
     sanction_amount DECIMAL(14,2), -- separate from recommended amount
     actual_completion_amount DECIMAL(14,2),

@@ -23,25 +23,27 @@ class WorkKPIs(BaseModel):
  
  
 class CheckTypeBreakdown(BaseModel):
+    # Only the checks derivable from project_directory. Progress mismatch and
+    # missing evidence need the expenditure feed / FILE_STATUS, which are not
+    # scraped yet, so they are omitted rather than reported as a false zero.
     cost_outlier: int
-    timing_anomaly: int
+    impossible_timeline: int
     duplicate_match: int
     stalled: int
     concentration: int
-    missing_evidence: int
     round_number: int
-    impossible_timeline: int
-    sanction_backlog: int
  
  
 class StateRow(BaseModel):
     state: str
+    state_code: Optional[str]           # keys the frontend's SVG map paths
     works_monitored: int
     works_flagged: int
     avg_risk_score: float
     total_sanctioned: float
     pending_sanction_count: int         # backlog signal
     pct_missing_sanction_date: float    # data quality signal
+    trend: list[int]                    # flagged works per recommendation month
  
  
 class RankedStatesResponse(BaseModel):

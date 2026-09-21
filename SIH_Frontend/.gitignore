@@ -1,7 +1,0 @@
-node_modules/
-dist/
-
-# Intermediate output of tools/unbundle.mjs; regenerate with `npm run unbundle`.
-# assets/ is NOT ignored — it is committed so a fresh clone runs without
-# needing the original 15 MB canvas export.
-extracted/

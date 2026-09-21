@@ -13,7 +13,7 @@ export default function Overview() {
             National Overview
           </h1>
           <p style={{ marginTop: "8px", maxWidth: "68ch", fontSize: "14px", lineHeight: "1.55", color: "var(--text-secondary)" }}>
-            Real-time fraud-risk posture across every MPLADS work under central monitoring — updated continuously from field, financial and satellite signals.
+            Anomaly checks computed over the eSAKSHI works register. Covers recommended and sanctioned works only — expenditure, vendor and field verification data are not ingested yet.
           </p>
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "11px", flexShrink: "0", position: "relative", paddingLeft: "32px", maxWidth: "440px" }}>
@@ -65,21 +65,14 @@ export default function Overview() {
           </div>
           <div aria-hidden="true" style={{ width: "100%", height: "1px", background: "currentColor", opacity: "0.11" }} />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap", gap: "6px 11px", fontSize: "10.5px", fontWeight: "600", letterSpacing: "0.1em", textTransform: "uppercase", opacity: "0.5", textAlign: "right" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "999px", background: "var(--risk-clear)" }} />
-              Verified {v.tickerSyncedLabel}
+            <span>
+              Source · eSAKSHI
             </span>
             <span style={{ opacity: "0.4" }}>
               ·
             </span>
             <span>
-              As of {v.sealDateLabel}
-            </span>
-            <span style={{ opacity: "0.4" }}>
-              ·
-            </span>
-            <span>
-              PFMS · MPLADS MIS · Bhuvan
+              Last synced {v.lastSyncedLabel}
             </span>
           </div>
         </div>
@@ -111,7 +104,7 @@ export default function Overview() {
             Flagged works by state
           </h2>
           <p style={{ margin: "2px 0 0", fontSize: "12.5px", color: "var(--text-secondary)" }}>
-            Click a state to open its district breakdown.
+            Shaded by number of flagged works.
           </p>
           <div style={{ marginTop: "16px", borderRadius: "12px", border: "1px solid var(--border-color)", padding: "16px", display: "flex", justifyContent: "center", background: "var(--map-bg)" }}>
             <svg viewBox={`0 0 ${v.indiaMapW} ${v.indiaMapH}`} style={{ width: "100%", maxWidth: "380px", height: "auto" }}>
@@ -122,7 +115,7 @@ export default function Overview() {
               ))}
               {(v.mapCells ?? []).map((c, cIndex) => (
                 <React.Fragment key={cIndex}>
-                  <path d={c.d} fill={c.fill} stroke={v.mapBg} strokeWidth="0.8" style={{ cursor: "pointer" }} onClick={c.open}>
+                  <path d={c.d} fill={c.fill} stroke={v.mapBg} strokeWidth="0.8" style={{ cursor: c.open ? "pointer" : "default" }} onClick={c.open}>
                     <title>
                       {c.title}
                     </title>
@@ -180,7 +173,7 @@ export default function Overview() {
               States ranked by flagged works
             </h2>
             <p style={{ margin: "2px 0 0", fontSize: "12.5px", color: "var(--text-secondary)" }}>
-              8-period risk trend shown alongside each state.
+              Trend shows flagged works by recommendation month, last 8 months.
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -212,14 +205,14 @@ export default function Overview() {
                 Avg. risk
               </th>
               <th style={{ textAlign: "left", padding: "var(--cell-pad)", fontSize: "11.5px", fontWeight: "600", color: "var(--text-muted)" }}>
-                8-period trend
+                Flagged by month
               </th>
             </tr>
           </thead>
           <tbody>
             {(v.sortedStateRows ?? []).map((row, rowIndex) => (
               <React.Fragment key={rowIndex}>
-                <tr onClick={row.open} style={{ borderBottom: "1px solid var(--border-color)", cursor: "pointer" }}>
+                <tr onClick={row.open} style={{ borderBottom: "1px solid var(--border-color)", cursor: row.open ? "pointer" : "default" }}>
                   <td style={{ padding: "var(--cell-pad)", fontSize: "13px", color: "var(--text-muted)" }}>
                     {row.rank}
                   </td>

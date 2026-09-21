@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-@router.get("/project_list")
+@router.get("/project_list/{state}")
 def project_list():
     return "projects under a particular states"
 

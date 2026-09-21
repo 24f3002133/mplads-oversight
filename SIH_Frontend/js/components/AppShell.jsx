@@ -9,7 +9,6 @@ const Contractors = React.lazy(() => import('../pages/Contractors.jsx'));
 const Reports = React.lazy(() => import('../pages/Reports.jsx'));
 const Settings = React.lazy(() => import('../pages/Settings.jsx'));
 const CommandPalette = React.lazy(() => import('../components/CommandPalette.jsx'));
-const Copilot = React.lazy(() => import('../components/Copilot.jsx'));
 const DistrictModal = React.lazy(() => import('../components/DistrictModal.jsx'));
 const WorkModal = React.lazy(() => import('../components/WorkModal.jsx'));
 
@@ -84,27 +83,7 @@ export default function AppShell() {
       </svg>
       <div style={{ maxWidth: "1440px", margin: "0 auto", padding: "16px 24px 0" }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "12px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: "0", flex: "1", borderRadius: "8px", border: "1px solid var(--border-color)", background: v.tickerBg, padding: "var(--cell-pad)", boxShadow: "0 1px 2px rgba(19,26,34,0.05)", transition: "background 0.6s" }}>
-            <span style={{ position: "relative", display: "inline-flex", width: "8px", height: "8px", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ position: "absolute", display: "inline-flex", width: "8px", height: "8px", borderRadius: "999px", background: "var(--risk-high)", opacity: "0.6", animation: "mp-ping 1.6s cubic-bezier(0,0,0.2,1) infinite" }} />
-              <span style={{ position: "relative", display: "inline-flex", width: "6px", height: "6px", borderRadius: "999px", background: "var(--risk-high)" }} />
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", fontWeight: "700", letterSpacing: "0.08em", color: "var(--risk-high)", textTransform: "uppercase", flexShrink: "0" }}>
-              Live
-            </span>
-            <div style={{ minWidth: "0", flex: "1", overflow: "hidden" }}>
-              <div style={{ display: "inline-flex", whiteSpace: "nowrap", animation: "mp-marquee 28s linear infinite" }}>
-                <span style={{ paddingRight: "56px", fontSize: "13px" }} dangerouslySetInnerHTML={v.tickerMarqueeHtml} />
-                <span style={{ paddingRight: "56px", fontSize: "13px" }} dangerouslySetInnerHTML={v.tickerMarqueeHtml} />
-              </div>
-            </div>
-            <span style={{ flexShrink: "0", fontSize: "11px", color: "var(--text-muted)" }}>
-              {v.tickerCount} events today
-            </span>
-            <span style={{ flexShrink: "0", fontSize: "11px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-              Synced {v.tickerSyncedLabel}
-            </span>
-          </div>
+          <div style={{ minWidth: "0", flex: "1" }} />
           <button onClick={v.toggleDarkMode} title={v.darkModeTitle} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "36px", height: "36px", borderRadius: "8px", padding: "0", cursor: "pointer", fontFamily: "inherit", border: `1px solid ${v.darkModeBorder}`, background: v.darkModeBg, color: v.darkModeColor, flexShrink: "0", boxShadow: "0 1px 2px rgba(19,26,34,0.05)" }}>
             {v.darkMode && (
               <>
@@ -135,30 +114,6 @@ export default function AppShell() {
               ⌘K
             </span>
           </button>
-          <button onClick={v.exportCurrentReport} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", width: "124px", height: "36px", borderRadius: "8px", padding: "0", fontSize: "12.5px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit", border: "1px solid var(--border-color)", background: "var(--card-bg)", color: "var(--text-primary)", whiteSpace: "nowrap", flexShrink: "0", boxShadow: "0 1px 2px rgba(19,26,34,0.05)" }}>
-            {v.exportReportLabel}
-          </button>
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "12px", marginTop: "16px" }}>
-          {v.canSwitchScope && (
-            <>
-            <div style={{ display: "flex", alignItems: "center", borderRadius: "8px", border: "1px solid var(--border-color)", background: "var(--card-bg)", padding: "4px", boxShadow: "0 1px 2px rgba(19,26,34,0.05)" }}>
-              <button onClick={v.setScopeLocal} style={{ display: "flex", alignItems: "center", gap: "6px", border: "none", borderRadius: "6px", padding: "6px 12px", fontSize: "12.5px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit", background: v.scopeLocalBg, color: v.scopeLocalColor, whiteSpace: "nowrap" }}>
-                Local scope · {v.sessionDistrict}
-              </button>
-              <button onClick={v.setScopeNational} style={{ display: "flex", alignItems: "center", gap: "6px", border: "none", borderRadius: "6px", padding: "6px 12px", fontSize: "12.5px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit", background: v.scopeNationalBg, color: v.scopeNationalColor, whiteSpace: "nowrap" }}>
-                National overview
-              </button>
-            </div>
-            </>
-          )}
-          {v.showScopedBadge && (
-            <>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", borderRadius: "8px", border: "1px solid var(--border-color)", background: "var(--card-bg)", padding: "6px 12px", fontSize: "12.5px", fontWeight: "600", color: "var(--text-secondary)", boxShadow: "0 1px 2px rgba(19,26,34,0.05)", whiteSpace: "nowrap", flexShrink: "0" }}>
-              Scoped to {v.sessionDistrict}, {v.sessionState}
-            </div>
-            </>
-          )}
         </div>
       </div>
       <main style={{ maxWidth: "1440px", margin: "0 auto", padding: "24px" }}>
@@ -219,14 +174,6 @@ export default function AppShell() {
     {v.paletteOpen && (
       <React.Suspense fallback={null}>
         <CommandPalette />
-      </React.Suspense>
-    )}
-    <button onClick={v.toggleCopilot} aria-label="Open AI copilot" className="mp-glow" title="Oversight Copilot" style={{ position: "fixed", bottom: "24px", right: "24px", zIndex: "50", width: "56px", height: "56px", borderRadius: "999px", border: "none", background: "var(--copilot-accent)", color: "var(--copilot-accent-fg)", fontSize: "22px", cursor: "pointer", boxShadow: "0 12px 24px -8px rgba(19,26,34,0.4)" }}>
-      {v.copilotIcon}
-    </button>
-    {v.copilotOpen && (
-      <React.Suspense fallback={null}>
-        <Copilot />
       </React.Suspense>
     )}
     {v.districtModalOpen && (
