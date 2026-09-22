@@ -6,7 +6,7 @@ const BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000/api/v1';
 // The API reports only the checks it can derive from the works data. Progress
 // mismatch and missing evidence need the expenditure feed, which is not
 // scraped yet, so they are absent rather than shown as zero.
-const CHECK_LABELS = {
+export const CHECK_LABELS = {
   cost_outlier: 'Cost outlier',
   impossible_timeline: 'Impossible timeline',
   duplicate_match: 'Duplicate match',
@@ -14,6 +14,11 @@ const CHECK_LABELS = {
   concentration: 'Concentration',
   round_number: 'Round-number amount',
 };
+
+export const WORK_STATUSES = [
+  'Pending for Sanction', 'Physical Inspection', 'Vendor Identification',
+  'Work partially Completed', 'Work Completed', 'Time Estimation', 'NA',
+];
 
 async function get(path) {
   const res = await fetch(`${BASE}${path}`);
@@ -46,4 +51,23 @@ export async function fetchOverview() {
     })),
     lastSyncedAt: status.last_synced_at,
   };
+}
+
+export async function fetchWorks({ state, status, checkType, query, page, pageSize }) {
+  const p = new URLSearchParams();
+  if (state) p.set('state', state);
+  if (status) p.set('status', status);
+  if (checkType) p.set('check_type', checkType);
+  if (query) p.set('q', query);
+  p.set('limit', pageSize);
+  p.set('offset', (page - 1) * pageSize);
+  return get(`/works/project_data?${p}`);
+}
+
+export async function fetchStateDetail(state) {
+  return get(`/overview/state_map/${encodeURIComponent(state)}`);
+}
+
+export async function fetchDossier(workId) {
+  return get(`/dossier/${encodeURIComponent(workId)}`);
 }

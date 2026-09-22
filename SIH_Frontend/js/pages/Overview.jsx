@@ -101,10 +101,10 @@ export default function Overview() {
       <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: "20px" }}>
         <div style={{ borderRadius: "12px", border: "1px solid var(--border-color)", background: "var(--card-bg)", padding: "20px", boxShadow: "0 1px 2px rgba(19,26,34,0.05)" }}>
           <h2 style={{ fontFamily: "'Source Serif 4',serif", fontSize: "19px", fontWeight: "700", letterSpacing: "-0.012em", margin: "0", color: "var(--heading-color)" }}>
-            Flagged works by state
+            Risk by state
           </h2>
           <p style={{ margin: "2px 0 0", fontSize: "12.5px", color: "var(--text-secondary)" }}>
-            Shaded by number of flagged works.
+            Shaded by average risk score. Click a state for its highest-risk works.
           </p>
           <div style={{ marginTop: "16px", borderRadius: "12px", border: "1px solid var(--border-color)", padding: "16px", display: "flex", justifyContent: "center", background: "var(--map-bg)" }}>
             <svg viewBox={`0 0 ${v.indiaMapW} ${v.indiaMapH}`} style={{ width: "100%", maxWidth: "380px", height: "auto" }}>
@@ -126,7 +126,7 @@ export default function Overview() {
           </div>
           <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", color: "var(--text-muted)" }}>
             <span>
-              Fewer flagged
+              Lower risk
             </span>
             <div style={{ display: "flex", height: "8px", flex: "1", maxWidth: "220px", overflow: "hidden", borderRadius: "999px" }}>
               {(v.legendCells ?? []).map((lc, lcIndex) => (
@@ -136,7 +136,7 @@ export default function Overview() {
               ))}
             </div>
             <span>
-              More flagged
+              Higher risk
             </span>
           </div>
         </div>

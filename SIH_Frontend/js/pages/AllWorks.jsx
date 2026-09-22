@@ -18,9 +18,11 @@ export default function AllWorks() {
         </div>
         <div style={{ display: "flex", alignItems: "flex-start", gap: "20px", flexWrap: "wrap", justifyContent: "flex-end" }}>
           <div style={{ position: "relative", flexShrink: "0" }}>
+            {v.csvAvailable && (
             <button onClick={v.toggleCsvMenu} className="mp-glow" title="Export the works matching your current filters" style={{ borderRadius: "6px", padding: "7px 14px", fontSize: "12.5px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit", border: "1px solid var(--border-color)", background: "var(--card-bg)", whiteSpace: "nowrap", color: "var(--text-primary)" }}>
               Export CSV ({v.allworksResultCount}) ▾
             </button>
+            )}
             {v.csvMenuOpen && (
               <>
               <div onClick={v.closeCsvMenu} style={{ position: "fixed", inset: "0", zIndex: "55" }} />
@@ -121,21 +123,14 @@ export default function AllWorks() {
             </div>
             <div aria-hidden="true" style={{ width: "100%", height: "1px", background: "currentColor", opacity: "0.11" }} />
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap", gap: "6px 11px", fontSize: "10.5px", fontWeight: "600", letterSpacing: "0.1em", textTransform: "uppercase", opacity: "0.5", textAlign: "right" }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "999px", background: "var(--risk-clear)" }} />
-                Verified {v.tickerSyncedLabel}
+              <span>
+                Source · eSAKSHI
               </span>
               <span style={{ opacity: "0.4" }}>
                 ·
               </span>
               <span>
-                As of {v.sealDateLabel}
-              </span>
-              <span style={{ opacity: "0.4" }}>
-                ·
-              </span>
-              <span>
-                MPLADS MIS · e-Gram Swaraj
+                Last synced {v.lastSyncedLabel}
               </span>
             </div>
           </div>
@@ -158,23 +153,11 @@ export default function AllWorks() {
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "12px", borderRadius: "12px", border: "1px solid var(--border-color)", background: "var(--card-bg)", padding: "14px", boxShadow: "0 1px 2px rgba(19,26,34,0.05)" }}>
         <div style={{ display: "flex", flex: "1", flexWrap: "wrap", alignItems: "center", gap: "8px" }}>
           <input value={v.allworksQuery} onChange={v.setAllworksQuery} placeholder="Search work ID, title or agency…" style={{ minWidth: "200px", flex: "1", height: "32px", borderRadius: "6px", border: "1px solid var(--border-color)", padding: "0 10px", fontSize: "13px", fontFamily: "inherit", background: "var(--card-bg)", color: "var(--text-primary)" }} />
-          <select value={v.allworksDistrict} onChange={v.setAllworksDistrict} style={{ height: "32px", borderRadius: "6px", border: "1px solid var(--border-color)", padding: "0 8px", fontSize: "13px", fontFamily: "inherit", background: "var(--card-bg)", color: "var(--text-primary)" }}>
+          <select value={v.allworksState} onChange={v.setAllworksState} style={{ height: "32px", borderRadius: "6px", border: "1px solid var(--border-color)", padding: "0 8px", fontSize: "13px", fontFamily: "inherit", background: "var(--card-bg)", color: "var(--text-primary)" }}>
             <option value="__all__">
-              All districts
+              All states
             </option>
-            {(v.districtOptions ?? []).map((d, dIndex) => (
-              <React.Fragment key={dIndex}>
-                <option value={d.value}>
-                  {d.label}
-                </option>
-              </React.Fragment>
-            ))}
-          </select>
-          <select value={v.allworksSector} onChange={v.setAllworksSector} style={{ height: "32px", borderRadius: "6px", border: "1px solid var(--border-color)", padding: "0 8px", fontSize: "13px", fontFamily: "inherit", background: "var(--card-bg)", color: "var(--text-primary)" }}>
-            <option value="__all__">
-              All sectors
-            </option>
-            {(v.sectorOptions ?? []).map((op, opIndex) => (
+            {(v.allworksStateOptions ?? []).map((op, opIndex) => (
               <React.Fragment key={opIndex}>
                 <option value={op}>
                   {op}
@@ -234,9 +217,6 @@ export default function AllWorks() {
                   Sanctioned
                 </th>
                 <th style={{ textAlign: "left", padding: "var(--cell-pad)", fontSize: "11.5px", fontWeight: "600", color: "var(--text-muted)" }}>
-                  Progress
-                </th>
-                <th style={{ textAlign: "left", padding: "var(--cell-pad)", fontSize: "11.5px", fontWeight: "600", color: "var(--text-muted)" }}>
                   Status
                 </th>
                 <th style={{ textAlign: "left", padding: "var(--cell-pad)", fontSize: "11.5px", fontWeight: "600", color: "var(--text-muted)" }}>
@@ -261,16 +241,6 @@ export default function AllWorks() {
                     </td>
                     <td style={{ padding: "var(--cell-pad)", textAlign: "right", fontSize: "13px", fontWeight: "500" }}>
                       {w.sanctioned}
-                    </td>
-                    <td style={{ padding: "var(--cell-pad)", width: "110px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <div style={{ width: "64px", height: "6px", borderRadius: "999px", background: "var(--surface-muted)", overflow: "hidden" }}>
-                          <div style={{ height: "100%", borderRadius: "999px", width: `${w.progress}%`, background: w.progressColor }} />
-                        </div>
-                        <span style={{ fontSize: "11.5px", color: "var(--text-muted)" }}>
-                          {w.progress}%
-                        </span>
-                      </div>
                     </td>
                     <td style={{ padding: "var(--cell-pad)" }}>
                       <span style={{ display: "inline-flex", alignItems: "center", borderRadius: "6px", padding: "2px 8px", fontSize: "11.5px", fontWeight: "600", whiteSpace: "nowrap", background: w.statusBg, color: w.statusColor }}>

@@ -31,7 +31,12 @@ import {
   REG_DISTRICTS,
   MOCK_EMAILS,
 } from '../data/mock.js';
-import { fetchOverview } from '../api.js';
+import { fetchOverview, fetchWorks, fetchStateDetail, fetchDossier, CHECK_LABELS, WORK_STATUSES } from '../api.js';
+
+const ALLWORKS_PAGE_SIZE = 14;
+const CHECK_KEY_BY_LABEL = Object.fromEntries(
+  Object.entries(CHECK_LABELS).map(([key, label]) => [label, key]),
+);
 
 let INDIA_STATE_PATHS = null, INDIA_MAP_W = 520, INDIA_MAP_H = 560;
 
@@ -54,16 +59,38 @@ export default class AppState extends React.Component {
     overviewSortKey: 'flagged',
     districtModalStateId: null,
     workModalId: null, workModalNote: '', workModalSavedAt: null, workModalDecision: null,
+    workModalDossier: null, workModalDossierLoading: false,
     allworksQuery: '', allworksSector: ALL, allworksStatus: ALL, allworksCheckType: ALL, allworksPage: 1,
     queueTab: 'awaiting', reportGeneratingId: null, toast: null, trackedIds: [],
     loginError: null, regToastMsg: null,
     overviewLive: null,
+    allworksState: ALL, worksLive: null, stateDetail: null,
   };
+
+  _worksKey = null;
+
+  _loadWorks() {
+    const s = this.state;
+    const key = [s.allworksState, s.allworksStatus, s.allworksCheckType, s.allworksQuery, s.allworksPage].join('|');
+    if (key === this._worksKey) return;
+    this._worksKey = key;
+    fetchWorks({
+      state: s.allworksState === ALL ? null : s.allworksState,
+      status: s.allworksStatus === ALL ? null : s.allworksStatus,
+      checkType: s.allworksCheckType === ALL ? null : CHECK_KEY_BY_LABEL[s.allworksCheckType],
+      query: s.allworksQuery,
+      page: s.allworksPage,
+      pageSize: ALLWORKS_PAGE_SIZE,
+    })
+      .then((worksLive) => { if (key === this._worksKey) this.setState({worksLive}); })
+      .catch(() => {});
+  }
 
   componentDidMount() {
     fetchOverview()
       .then((overviewLive) => this.setState({overviewLive}))
       .catch(() => {});  // API down: the overview falls back to mock.js
+    this._loadWorks();
     this.syncTheme(this._vals ?? {});
     if (this.state.route === 'app') this._loadIndiaMap();
     try {
@@ -83,6 +110,7 @@ export default class AppState extends React.Component {
   componentDidUpdate() {
     this.syncTheme(this._vals ?? {});
     if (this.state.route === 'app') this._loadIndiaMap();
+    this._loadWorks();
   }
 
   componentWillUnmount() {
@@ -167,9 +195,15 @@ export default class AppState extends React.Component {
   openWorkModal = (id) => () => {
     let note = '';
     try { const raw = window.localStorage.getItem('mplads.draft.'+id); if (raw) note = raw; } catch(e) {}
-    this.setState({workModalId:id, workModalNote:note, workModalDecision:null, workModalSavedAt:null});
+    this.setState({workModalId:id, workModalNote:note, workModalDecision:null, workModalSavedAt:null, workModalDossier:null, workModalDossierLoading:false});
+    if (this.state.overviewLive) {
+      this.setState({workModalDossierLoading:true});
+      fetchDossier(id)
+        .then((dossier) => { if (this.state.workModalId === id) this.setState({workModalDossier:dossier, workModalDossierLoading:false}); })
+        .catch(() => { if (this.state.workModalId === id) this.setState({workModalDossierLoading:false}); });
+    }
   };
-  closeWorkModal = () => this.setState({workModalId:null});
+  closeWorkModal = () => this.setState({workModalId:null, workModalDossier:null, workModalDossierLoading:false});
   setWorkNote = (e) => {
     const v = e.target.value;
     this.setState({workModalNote:v});
@@ -193,12 +227,18 @@ export default class AppState extends React.Component {
   });
 
   openDistrictModal = (id) => () => this.setState({districtModalStateId:id});
-  closeDistrictModal = () => this.setState({districtModalStateId:null});
+  closeDistrictModal = () => this.setState({districtModalStateId:null, stateDetail:null});
+  openStateModal = (name) => () => {
+    this.setState({districtModalStateId:name, stateDetail:null});
+    fetchStateDetail(name)
+      .then((stateDetail) => { if (this.state.districtModalStateId === name) this.setState({stateDetail}); })
+      .catch(() => {});
+  };
   setOverviewSort = (key) => () => this.setState({overviewSortKey:key});
 
   setAllworksField = (field) => (e) => this.setState({[field]: e.target.value, allworksPage:1});
   setAllworksPage = (n) => () => this.setState({allworksPage:n});
-  clearAllworksFilters = () => this.setState({allworksQuery:'', allworksSector:ALL, allworksStatus:ALL, allworksCheckType:ALL, allworksDistrict:ALL, allworksPage:1});
+  clearAllworksFilters = () => this.setState({allworksQuery:'', allworksSector:ALL, allworksStatus:ALL, allworksCheckType:ALL, allworksDistrict:ALL, allworksState:ALL, allworksPage:1});
 
   setQueueAwaiting = () => this.setState({queueTab:'awaiting'});
   setQueueResolved = () => this.setState({queueTab:'resolved'});
@@ -434,14 +474,14 @@ export default class AppState extends React.Component {
       {label:'Avg. national risk score', value:`${avgRiskNat}`, color:MED},
       {label:'Total funds sanctioned', value: money(totalSanctioned), color:T.text, sub:'across monitored works'},
     ];
-    const maxFlagged = Math.max(...ovStates.map((x) => x.flagged)) || 1;
+    const maxAvgRisk = Math.max(...ovStates.map((x) => x.avgRisk)) || 1;
     const mapReady = !!INDIA_STATE_PATHS;
     const stateIds = new Set(ovStates.map((x) => x.id));
     const mapCells = mapReady ? ovStates.filter((st) => INDIA_STATE_PATHS[st.id]).map((st) => {
-      const t = st.flagged/maxFlagged;
+      const t = st.avgRisk/maxAvgRisk;
       return { id:st.id, d: INDIA_STATE_PATHS[st.id], fill: hexMix(T.mapMuted, HIGH, t),
         title:`${st.name} — ${st.flagged} flagged of ${st.monitored} monitored, avg risk ${st.avgRisk}`,
-        open: live ? undefined : this.openDistrictModal(st.id) };
+        open: live ? this.openStateModal(st.name) : this.openDistrictModal(st.id) };
     }) : [];
     const mapOtherPaths = mapReady ? Object.keys(INDIA_STATE_PATHS).filter((id) => !stateIds.has(id)).map((id) => INDIA_STATE_PATHS[id]) : [];
     const legendCells = Array.from({length:12}, (_, i) => hexMix(T.mapMuted, HIGH, i/11));
@@ -460,7 +500,7 @@ export default class AppState extends React.Component {
       return { rank:i+1, name:st.name, monitored: st.monitored.toLocaleString('en-IN'), flagged: st.flagged.toLocaleString('en-IN'),
         riskBg: RISK_WASH[band], riskColor: RISK_COLORS[band], riskLabel: `${st.avgRisk} · ${RISK_LABEL[band]}`,
         sparkPoints: pts.join(' '), sparkColor: rising?HIGH:T.textMuted, sparkLastY: pts[pts.length-1].split(',')[1],
-        open: live ? undefined : this.openDistrictModal(st.id) };
+        open: live ? this.openStateModal(st.name) : this.openDistrictModal(st.id) };
     });
 
     const MONTHS = ['Feb','Mar','Apr','May','Jun','Jul','Aug'];
@@ -542,21 +582,36 @@ export default class AppState extends React.Component {
     function STATUS_BG(status){ return (STATUS_TONE[status]||ONGOING_TONE).bg; }
     function STATUS_COLOR(status){ return (STATUS_TONE[status]||ONGOING_TONE).fg; }
 
+    const wl = s.worksLive;
     const allworksFiltered = filterWorks(WORKS, {query:s.allworksQuery, sector:s.allworksSector, status:s.allworksStatus, checkType:s.allworksCheckType, district:s.allworksDistrict});
-    const ALLWORKS_PAGE_SIZE = 14;
-    const allworksTotalPages = Math.max(1, Math.ceil(allworksFiltered.length/ALLWORKS_PAGE_SIZE));
+    const allworksResultCount = wl ? wl.total : allworksFiltered.length;
+    const allworksTotalPages = Math.max(1, Math.ceil(allworksResultCount/ALLWORKS_PAGE_SIZE));
     const allworksPageClamped = Math.min(s.allworksPage, allworksTotalPages);
     const allworksPageItems = allworksFiltered.slice((allworksPageClamped-1)*ALLWORKS_PAGE_SIZE, allworksPageClamped*ALLWORKS_PAGE_SIZE);
-    const completedCount = WORKS.filter((w) => w.status==='Completed').length;
 
-    const allworksRows = worksTableRows(allworksPageItems, true, this.openWorkModal);
-    const allworksHasActiveFilters = !!s.allworksQuery || s.allworksSector!==ALL || s.allworksStatus!==ALL || s.allworksCheckType!==ALL || s.allworksDistrict!==ALL;
+    const allworksRows = wl ? wl.works.map((w) => {
+      const band = riskBand(w.risk_score);
+      const tags = w.checks.map((c) => CHECK_LABELS[c] ?? c);
+      const extraTags = Math.max(0, tags.length-2);
+      return { id:w.work_id, title:w.description, sub:`${w.work_id} · ${w.mp_name ?? ''}`,
+        location:[w.constituency, w.state].filter(Boolean).join(', '), sanctioned: money(w.sanction_amount ?? 0),
+        statusLabel:w.status, statusBg: STATUS_BG(w.status), statusColor: STATUS_COLOR(w.status),
+        riskBg: RISK_WASH[band], riskColor: RISK_COLORS[band], riskLabel:`${w.risk_score} · ${RISK_LABEL[band]}`,
+        dense:true, tags: tags.slice(0,2), extraTags, hasExtraTags: extraTags>0, open: this.openWorkModal(w.work_id) };
+    }) : worksTableRows(allworksPageItems, true, this.openWorkModal);
+
+    const allworksHasActiveFilters = !!s.allworksQuery || s.allworksState!==ALL || s.allworksStatus!==ALL || s.allworksCheckType!==ALL;
     const allworksPrevPage = () => this.setState({allworksPage: Math.max(1, allworksPageClamped-1)});
     const allworksNextPage = () => this.setState({allworksPage: Math.min(allworksTotalPages, allworksPageClamped+1)});
-    const allworksStats = [
+    const allworksStats = wl ? [
+      {label:'Total works', value: wl.total.toLocaleString('en-IN'), color:T.text},
+      {label:'Completed', value: wl.completed.toLocaleString('en-IN'), color:CLEAR},
+      {label:'Flagged (≥40)', value: wl.flagged.toLocaleString('en-IN'), color:HIGH},
+      {label:'Total sanctioned', value: money(wl.total_sanctioned), color:T.text},
+    ] : [
       {label:'Total works', value: WORKS.length.toLocaleString('en-IN'), color:T.text},
-      {label:'Completed', value: completedCount.toLocaleString('en-IN'), color:CLEAR},
-      {label:'Total sanctioned', value: money(totalSanctioned), color:T.text},
+      {label:'Completed', value: WORKS.filter((w) => w.status==='Completed').length.toLocaleString('en-IN'), color:CLEAR},
+      {label:'Total sanctioned', value: money(WORKS.reduce((a,w) => a+w.sanctioned, 0)), color:T.text},
       {label:'Sectors covered', value:`${SECTORS.length}`, color:T.text},
     ];
 
@@ -636,52 +691,82 @@ export default class AppState extends React.Component {
       {label:'Total idle funds', value: money(contractorRanked.reduce((a,c) => a+c.idleFunds,0)), color:MED},
     ];
     let wm = {};
-    if (workModalWork) {
-      const w = workModalWork;
-      const band = riskBand(w.riskScore);
-      const seed = seeded(w.id, 3);
-      const scatterRaw = Array.from({length:24}, (_, i) => ((seed>>(i%20))%100)/100*(w.sanctioned/60000)+w.sanctioned/220000);
-      const highlight = w.sanctioned/60000;
-      const maxS = Math.max(...scatterRaw, highlight)*1.1;
-      const mean = scatterRaw.reduce((a,b) => a+b, 0)/scatterRaw.length;
+    const dossier = s.workModalDossier && s.workModalDossier.work_id === s.workModalId ? s.workModalDossier : null;
+    const w = dossier || workModalWork;
+    if (w) {
+      const isLive = !!dossier;
+      const workId = w.work_id ?? w.id;
+      const title = w.description ?? w.title;
+      const status = w.status;
+      const state = w.state;
+      const band = riskBand(w.risk_score ?? w.riskScore);
+      const checkTags = isLive ? w.checks.map((c) => CHECK_LABELS[c] ?? c) : w.checkTags;
+
       const padS=24, widthS=480, heightS=180;
-      const scatterPoints = scatterRaw.map((p, i) => ({ cx: padS+(p/maxS)*(widthS-padS*2), cy: heightS-padS-12-((i*7)%40) }));
-      const utilPct = Math.round((w.utilised/w.sanctioned)*100);
+      let scatterPoints = [], scatterMeanX = padS, scatterHighlightX = padS, zScore = 0, peerN = 0;
+      if (isLive && w.cost_outlier && w.cost_outlier.scatter) {
+        const amounts = w.cost_outlier.scatter.map((p) => p.sanction_amount);
+        const highlight = w.sanction_amount ?? 0;
+        const maxS = Math.max(...amounts, highlight, w.cost_outlier.peer_avg) * 1.1 || 1;
+        const yStep = amounts.length ? (heightS - padS * 2 - 12) / amounts.length : 0;
+        scatterPoints = w.cost_outlier.scatter.map((p, i) => ({
+          cx: padS + (p.sanction_amount / maxS) * (widthS - padS * 2),
+          cy: heightS - padS - 12 - i * yStep,
+        }));
+        scatterMeanX = padS + (w.cost_outlier.peer_avg / maxS) * (widthS - padS * 2);
+        scatterHighlightX = padS + (highlight / maxS) * (widthS - padS * 2);
+        zScore = w.cost_outlier.z_score;
+        peerN = w.cost_outlier.peer_n;
+      }
+
+      const duplicateMatches = isLive ? (w.duplicate_matches || []).map((d) => ({
+        id: d.work_id,
+        title: d.description,
+        location: [d.constituency, d.state].filter(Boolean).join(', '),
+        sanctioned: money(d.sanction_amount ?? 0),
+      })) : [];
+
       const decision = s.workModalDecision;
-      const history = [
-        {time:'31 Aug 2026, 09:14', text:'Cost-outlier and progress-mismatch checks triggered by nightly batch scan.'},
-        {time:'2 Sep 2026, 11:40', text:`Case opened for review — assigned to District Collector, ${w.district}.`},
-        {time:'6 Sep 2026, 16:02', text:'Satellite change-detection re-run; bounding box confidence 0.91.'},
+      const history = decision ? [{time:'Just now', text:`Decision recorded: ${decision}.`, hash: hashFor(workId, 1)}] : [];
+
+      const metadata = isLive ? [
+        {k:'Implementing agency', v:w.ida_name ?? '—'},
+        {k:'Constituency', v:w.constituency ?? '—'},
+        {k:'Recommending MP', v:w.mp_name ?? '—'},
+        {k:'Status', v:w.status ?? '—'},
+        {k:'Recommended amount', v:money(w.recommended_amount ?? 0)},
+        {k:'Sanctioned amount', v:money(w.sanction_amount ?? 0)},
+      ] : [
+        {k:'Work type', v:w.subType}, {k:'Sector', v:w.sector}, {k:'Village', v:w.village}, {k:'Block', v:w.block},
+        {k:'Implementing agency', v:w.agency}, {k:'Recommending MP', v:w.mp},
       ];
-      if (decision) history.push({time:'Just now', text:`Decision recorded: ${decision}.`});
-      const newsBase = [
-        {source:'Lokmat Pune Edition', sentiment:'negative', text:`Villagers question delay in completion of ${w.title.toLowerCase()}, cite lack of visible progress.`},
-        {source:'Zilla Samvad Weekly', sentiment:'neutral', text:`Officials confirm site inspection scheduled for ${w.district} works this month.`},
-        {source:'Gram Panchayat Bulletin', sentiment:'positive', text:`Local sarpanch praises timely fund release for ${w.sector.toLowerCase()} initiative.`},
-      ];
-      const SENT_BG = {positive:CLEAR_WASH, neutral:T.surfaceMuted, negative:HIGH_WASH};
-      const SENT_COLOR = {positive:CLEAR, neutral:T.textSec, negative:HIGH};
+      const recommendedDate = w.recommended_date
+        ? new Date(w.recommended_date).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'})
+        : '—';
+      const peerAvg = isLive && w.cost_outlier
+        ? money(Math.round(w.cost_outlier.peer_avg))
+        : '—';
+
       wm = {
-        id:w.id, title:w.title, sector:w.sector, status:w.status, statusBg: STATUS_BG(w.status), statusColor: STATUS_COLOR(w.status),
-        locationLine:`${w.village}, ${w.block} · ${w.district}, ${w.state}`, riskScore:w.riskScore, riskColor: RISK_COLORS[band],
-        checksCount: w.checkTags.length, checkTags: w.checkTags,
-        hasCostOutlier: w.checkTags.includes('Cost outlier'), hasDuplicate: w.checkTags.includes('Duplicate match'),
-        hasProgressIssue: w.checkTags.includes('Progress mismatch')||w.checkTags.includes('Stalled'),
-        progressIssueLabel: w.checkTags.includes('Stalled') ? 'Work stalled' : 'Progress mismatch',
-        sdAbove: (3.1+(seeded(w.id,5)%12)/10).toFixed(1), subTypeLower: w.subType.toLowerCase(), state:w.state,
-        scatterMeanX: padS+(mean/maxS)*(widthS-padS*2), scatterHighlightX: padS+(highlight/maxS)*(widthS-padS*2), scatterPoints,
-        dupId: `MP-2024-${(seeded(w.id,9)%9999).toString().padStart(5,'0')}`, subType:w.subType, village:w.village, sanctionDate:w.sanctionDate, agency:w.agency,
-        progress:w.progress, utilPct, progressColor: w.progress>=75?CLEAR:w.progress>=40?MED:HIGH,
-        impliedProgress: Math.max(10, w.progress-22),
-        sharedDirectorCount: 2+(seeded(w.id,11)%3), soleBidderPct: 40+(seeded(w.id,17)%45),
-        news: newsBase.map((n) => ({...n, bg:SENT_BG[n.sentiment], color:SENT_COLOR[n.sentiment]})),
+        id:workId, title, status, statusBg: STATUS_BG(status), statusColor: STATUS_COLOR(status),
+        locationLine: isLive ? [w.constituency, w.state].filter(Boolean).join(', ') : `${w.village}, ${w.block} · ${w.district}, ${w.state}`,
+        riskScore: w.risk_score ?? w.riskScore, riskColor: RISK_COLORS[band],
+        checksCount: checkTags.length, checkTags,
+        hasCostOutlier: checkTags.includes('Cost outlier'),
+        hasDuplicate: checkTags.includes('Duplicate match'),
+        hasStalled: checkTags.includes('Stalled'),
+        peerAvg, recommendedDate, zScore, peerN,
+        scatterMeanX, scatterHighlightX, scatterPoints,
+        duplicateMatches,
         savedLabel: s.workModalSavedAt ? 'Draft auto-saved to this device' : 'Not yet saved',
         clearAction: this.recordDecision('Cleared'), clarifyAction: this.recordDecision('Clarification requested'), escalateAction: this.recordDecision('Escalated to state'),
-        history: history.map((h, i) => ({...h, hash: hashFor(w.id, i+1)})),
-        metadata: [ ['Work type', w.subType], ['Sector', w.sector], ['Village', w.village], ['Block', w.block], ['Implementing agency', w.agency], ['Recommending MP', w.mp] ].map(([k,v]) => ({k,v})),
-        sanctioned: money(w.sanctioned), released: money(w.released), utilised: money(w.utilised), balance: money(w.sanctioned-w.utilised),
-        isTracked: s.trackedIds.includes(w.id), trackLabel: s.trackedIds.includes(w.id) ? '✓ Tracking' : 'Track this project',
-        trackAction: this.toggleTrack(w.id),
+        history,
+        metadata,
+        sanctioned: money(w.sanction_amount ?? w.sanctioned ?? 0),
+        recommended: money(w.recommended_amount ?? 0),
+        isTracked: s.trackedIds.includes(workId), trackLabel: s.trackedIds.includes(workId) ? '✓ Tracking' : 'Track this project',
+        trackAction: this.toggleTrack(workId),
+        loadingDossier: s.workModalDossierLoading && isLive,
       };
     }
 
@@ -738,7 +823,7 @@ export default class AppState extends React.Component {
       toggleDarkMode: this.toggleDarkMode, darkMode: s.darkMode, darkModeInv: !s.darkMode, darkModeTitle: s.darkMode?'Switch to light mode':'Switch to dark mode',
       darkModeBg: s.darkMode?PRI:T.card, darkModeColor: s.darkMode?PRI_FG:T.text, darkModeBorder: s.darkMode?PRI:T.border,
       exportAllworksCsv: this.exportAllworksCsv(allworksFiltered),
-      csvMenuOpen: s.csvMenuOpen, toggleCsvMenu: this.toggleCsvMenu, closeCsvMenu: this.closeCsvMenu,
+      csvAvailable: !wl, csvMenuOpen: s.csvMenuOpen, toggleCsvMenu: this.toggleCsvMenu, closeCsvMenu: this.closeCsvMenu,
       csvScopeLabel: s.allworksDistrict===ALL ? 'All districts' : s.allworksDistrict.split('::').reverse().join(', '),
       csvHasItems: allworksFiltered.length>0, csvNoItems: allworksFiltered.length===0,
       csvMenuItems: allworksFiltered.slice(0,60).map((w) => ({
@@ -785,21 +870,38 @@ export default class AppState extends React.Component {
       copilotDraft: s.copilotDraft, setCopilotDraft: this.setCopilotDraft, copilotKeyDown: this.copilotKeyDown, sendCopilotMessage: this.sendCopilotMessage,
       toggleListening: this.toggleListening, listenBg: s.listening?PRI:T.card, listenColor: s.listening?'#fff':T.text, listenBorder: s.listening?PRI:T.border,
       districtModalOpen: !!s.districtModalStateId, closeDistrictModal: this.closeDistrictModal,
-      districtModalState: (() => { const st = STATES.find((x) => x.id===s.districtModalStateId); return st ? { name:st.name, flagged: st.flagged.toLocaleString(), monitored: st.monitored.toLocaleString(), avgRisk: st.avgRisk } : {name:'',flagged:'',monitored:'',avgRisk:''}; })(),
+      districtModalState: (() => {
+        if (live) {
+          const sd = s.stateDetail;
+          return sd ? { name:sd.state, flagged: sd.works_flagged.toLocaleString('en-IN'), monitored: sd.works_monitored.toLocaleString('en-IN'), avgRisk: sd.avg_risk_score }
+                    : { name: s.districtModalStateId ?? '', flagged:'…', monitored:'…', avgRisk:'…' };
+        }
+        const st = STATES.find((x) => x.id===s.districtModalStateId);
+        return st ? { name:st.name, flagged: st.flagged.toLocaleString(), monitored: st.monitored.toLocaleString(), avgRisk: st.avgRisk } : {name:'',flagged:'',monitored:'',avgRisk:''};
+      })(),
       districtModalWorks: (() => {
+        if (live) {
+          const sd = s.stateDetail;
+          if (!sd) return [];
+          return sd.works.map((w) => { const band = riskBand(w.risk_score); return { title:w.description, sub:`${w.work_id} · ${w.constituency ?? ''} · ${money(w.sanction_amount ?? 0)}`, riskBg:RISK_WASH[band], riskColor:RISK_COLORS[band], riskLabel:`${w.risk_score}`, open: this.openWorkModal(w.work_id) }; });
+        }
         const st = STATES.find((x) => x.id===s.districtModalStateId);
         if (!st) return [];
         return WORKS.filter((w) => w.state===st.name).slice(0,18).map((w) => { const band=riskBand(w.riskScore); return { title:w.title, sub:`${w.id} · ${w.district} · ${money(w.sanctioned)}`, riskBg:RISK_WASH[band], riskColor:RISK_COLORS[band], riskLabel:`${w.riskScore}`, open: this.openWorkModal(w.id) }; });
       })(),
 
       screen: s.screen,
-      sectorOptions: SECTORS, checkTypeOptions: CHECK_TYPES, allworksStatusOptions: STATUSES,
+      sectorOptions: SECTORS,
+      checkTypeOptions: wl ? Object.values(CHECK_LABELS) : CHECK_TYPES,
+      allworksStatusOptions: wl ? WORK_STATUSES : STATUSES,
+      allworksStateOptions: live ? live.states.map((x) => x.name) : [],
+      allworksState: s.allworksState, setAllworksState: this.setAllworksField('allworksState'),
       allworksQuery: s.allworksQuery, allworksSector: s.allworksSector, allworksStatus: s.allworksStatus, allworksCheckType: s.allworksCheckType,
-      allworksResultCount: allworksFiltered.length, allworksHasActiveFilters, allworksRows, allworksHasRows: allworksRows.length>0, allworksNoRows: allworksRows.length===0,
+      allworksResultCount, allworksHasActiveFilters, allworksRows, allworksHasRows: allworksRows.length>0, allworksNoRows: allworksRows.length===0,
       allworksShowPagination: allworksTotalPages>1, allworksPageNumbers: pageNumbers(allworksTotalPages, allworksPageClamped, this.setAllworksPage), allworksPrevPage, allworksNextPage,
       setAllworksQuery: this.setAllworksField('allworksQuery'), setAllworksSector: this.setAllworksField('allworksSector'), setAllworksStatus: this.setAllworksField('allworksStatus'), setAllworksCheckType: this.setAllworksField('allworksCheckType'), clearAllworksFilters: this.clearAllworksFilters,
       openWorkModal: this.openWorkModal,
-      workModalOpen: !!workModalWork, workModalNote: s.workModalNote, workModalDecision: s.workModalDecision, wm,
+      workModalOpen: !!s.workModalId, workModalNote: s.workModalNote, workModalDecision: s.workModalDecision, wm,
       closeWorkModal: this.closeWorkModal, setWorkNote: this.setWorkNote, aiDraftNote: this.aiDraftNote, recordDecision: this.recordDecision,
     };
   }

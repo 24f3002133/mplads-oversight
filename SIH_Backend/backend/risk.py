@@ -38,11 +38,12 @@ STATE_CODES = {
 
 # Cost outliers are measured against works at the same stage in the same state,
 # since sanction amounts are not comparable across stages.
-_SCORED_TABLE = """
+SCORED_TABLE = """
 CREATE TEMP TABLE scored ON COMMIT DROP AS
 WITH base AS (
-    SELECT work_id, state, ida_name, status, sanction_amount, recommended_amount,
-           recommended_date, sanctioned_date, lower(btrim(description)) AS norm_desc
+    SELECT work_id, state, constituency, ida_name, mp_name, status, description,
+           sanction_amount, recommended_amount, recommended_date, sanctioned_date,
+           lower(btrim(description)) AS norm_desc
     FROM project_directory
 ),
 stats AS (
@@ -57,8 +58,9 @@ stats AS (
     WINDOW w AS (PARTITION BY state, status)
 ),
 flagged AS (
-    SELECT work_id, state, status, sanction_amount, recommended_amount,
-           recommended_date, sanctioned_date,
+    SELECT work_id, state, constituency, ida_name, mp_name, description, status,
+           sanction_amount, recommended_amount, recommended_date, sanctioned_date,
+           peer_avg, peer_sd, peer_n,
            (peer_n >= 30 AND peer_sd > 0 AND sanction_amount IS NOT NULL
             AND abs(sanction_amount - peer_avg) / peer_sd >= 2.5) AS cost_outlier,
            (sanctioned_date IS NOT NULL AND recommended_date IS NOT NULL
@@ -86,7 +88,7 @@ _cache = {"at": 0.0, "data": None}
 
 def _compute():
     with get_cursor() as cur:
-        cur.execute(_SCORED_TABLE)
+        cur.execute(SCORED_TABLE)
         cur.execute("CREATE INDEX ON scored (state)")
         cur.execute("ANALYZE scored")
 

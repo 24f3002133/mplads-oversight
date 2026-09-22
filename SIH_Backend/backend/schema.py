@@ -1,6 +1,39 @@
 from pydantic import BaseModel
 from typing import Optional
 from enum import Enum
+from datetime import date
+
+
+class WorkRow(BaseModel):
+    work_id: str
+    description: Optional[str]
+    state: Optional[str]
+    constituency: Optional[str]
+    ida_name: Optional[str]
+    mp_name: Optional[str]
+    status: Optional[str]
+    sanction_amount: Optional[float]
+    recommended_date: Optional[date]
+    sanctioned_date: Optional[date]
+    risk_score: int
+    checks: list[str]
+
+
+class StateDetail(BaseModel):
+    state: str
+    works_monitored: int
+    works_flagged: int
+    avg_risk_score: float
+    total_sanctioned: float
+    works: list["WorkRow"]
+
+
+class WorksResponse(BaseModel):
+    total: int
+    completed: int
+    flagged: int
+    total_sanctioned: float
+    works: list[WorkRow]
 
 
 
@@ -78,5 +111,41 @@ class DataQuality(BaseModel):
     stage_na_count: int                 # 541
     file_status_true_count: int         # 24%
     file_status_true_pct: float
- 
+
+
+class CostOutlierInfo(BaseModel):
+    z_score: float
+    peer_avg: float
+    peer_sd: float
+    peer_n: int
+    scatter: list[dict]
+
+
+class DuplicateMatch(BaseModel):
+    work_id: str
+    description: Optional[str]
+    state: Optional[str]
+    constituency: Optional[str]
+    ida_name: Optional[str]
+    sanction_amount: Optional[float]
+    sanctioned_date: Optional[date]
+
+
+class DossierResponse(BaseModel):
+    work_id: str
+    description: Optional[str]
+    state: Optional[str]
+    constituency: Optional[str]
+    ida_name: Optional[str]
+    mp_name: Optional[str]
+    status: Optional[str]
+    sanction_amount: Optional[float]
+    recommended_amount: Optional[float]
+    recommended_date: Optional[date]
+    sanctioned_date: Optional[date]
+    risk_score: int
+    checks: list[str]
+    cost_outlier: Optional[CostOutlierInfo]
+    duplicate_matches: list[DuplicateMatch]
+
  

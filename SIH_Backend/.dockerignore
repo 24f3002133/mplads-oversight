@@ -1,0 +1,9 @@
+# Keep the build context small — total_works.json alone is ~102 MB and the
+# scraper runs on the host, not in this image.
+data_pipeline/
+*.json
+*.csv
+*.html
+__pycache__/
+*.pyc
+.vscode/

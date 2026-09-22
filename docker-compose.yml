@@ -3,10 +3,26 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     ports:
-      - "16281:5432"
+      - "16281:16281"
     env_file: .env
     volumes:
       - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./SIH_Backend
+      dockerfile: ../Dockerfile.backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      # .env points DATABASE_URL at localhost:16281 for host processes (the
+      # scraper). Inside a container localhost is the container itself, so
+      # reach Postgres by service name on its internal port instead.
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      - postgres
 
   frontend:
     build:
