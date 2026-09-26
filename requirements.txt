@@ -3,3 +3,5 @@ uvicorn==0.23.2
 psycopg2-binary==2.9.12
 python-dotenv==1.2.2
 pydantic==2.13.4
+googlenewsdecoder==0.2.1
+curl_cffi

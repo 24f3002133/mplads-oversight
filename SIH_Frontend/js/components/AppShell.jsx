@@ -10,6 +10,7 @@ const Reports = React.lazy(() => import('../pages/Reports.jsx'));
 const Settings = React.lazy(() => import('../pages/Settings.jsx'));
 const CommandPalette = React.lazy(() => import('../components/CommandPalette.jsx'));
 const DistrictModal = React.lazy(() => import('../components/DistrictModal.jsx'));
+const GlossaryModal = React.lazy(() => import('../components/GlossaryModal.jsx'));
 const WorkModal = React.lazy(() => import('../components/WorkModal.jsx'));
 
 export default function AppShell() {
@@ -83,7 +84,24 @@ export default function AppShell() {
       </svg>
       <div style={{ maxWidth: "1440px", margin: "0 auto", padding: "16px 24px 0" }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "12px" }}>
-          <div style={{ minWidth: "0", flex: "1" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: "0", flex: "1", borderRadius: "8px", border: "1px solid var(--border-color)", background: "var(--card-bg)", padding: "10px 16px", boxShadow: "0 1px 2px rgba(19,26,34,0.05)" }}>
+            <span style={{ position: "relative", display: "inline-flex", width: "8px", height: "8px", alignItems: "center", justifyContent: "center", flexShrink: "0" }}>
+              <span style={{ position: "absolute", display: "inline-flex", width: "8px", height: "8px", borderRadius: "999px", background: "var(--risk-high)", opacity: "0.6", animation: "mp-ping 1.6s cubic-bezier(0,0,0.2,1) infinite" }} />
+              <span style={{ position: "relative", display: "inline-flex", width: "6px", height: "6px", borderRadius: "999px", background: "var(--risk-high)" }} />
+            </span>
+            <span style={{ fontSize: "10px", fontWeight: "700", letterSpacing: "0.08em", color: "var(--risk-high)", textTransform: "uppercase", flexShrink: "0" }}>
+              Live
+            </span>
+            <div style={{ minWidth: "0", flex: "1", overflow: "hidden", fontSize: "13px", whiteSpace: "nowrap", textOverflow: "ellipsis", color: "var(--text-primary)" }} title={v.liveTickerText}>
+              {v.liveTickerText}
+            </div>
+            <span style={{ flexShrink: "0", fontSize: "11px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+              {v.liveTickerCount} events today
+            </span>
+            <span style={{ flexShrink: "0", fontSize: "11px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+              Synced {v.liveTickerSyncedLabel}
+            </span>
+          </div>
           <button onClick={v.toggleDarkMode} title={v.darkModeTitle} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "36px", height: "36px", borderRadius: "8px", padding: "0", cursor: "pointer", fontFamily: "inherit", border: `1px solid ${v.darkModeBorder}`, background: v.darkModeBg, color: v.darkModeColor, flexShrink: "0", boxShadow: "0 1px 2px rgba(19,26,34,0.05)" }}>
             {v.darkMode && (
               <>
@@ -179,6 +197,11 @@ export default function AppShell() {
     {v.districtModalOpen && (
       <React.Suspense fallback={null}>
         <DistrictModal />
+      </React.Suspense>
+    )}
+    {v.glossaryOpen && (
+      <React.Suspense fallback={null}>
+        <GlossaryModal />
       </React.Suspense>
     )}
     {v.workModalOpen && (

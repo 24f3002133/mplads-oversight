@@ -16,7 +16,7 @@ export default function DistrictModal() {
             {v.districtModalState.flagged} flagged of {v.districtModalState.monitored} monitored works · avg. risk {v.districtModalState.avgRisk}
           </p>
         </div>
-        <div style={{ overflowY: "auto", padding: "0 24px" }}>
+        <div onScroll={v.onDistrictScroll} style={{ overflowY: "auto", padding: "0 24px" }}>
           {(v.districtModalWorks ?? []).map((w, wIndex) => (
             <React.Fragment key={wIndex}>
               <button onClick={w.open} style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", gap: "16px", border: "none", borderBottom: "1px solid var(--border-color)", background: "none", padding: "14px 0", textAlign: "left", cursor: "pointer", fontFamily: "inherit", color: "var(--text-primary)" }}>
@@ -34,6 +34,11 @@ export default function DistrictModal() {
               </button>
             </React.Fragment>
           ))}
+          {v.districtModalLoadingMore && (
+            <div className="mp-pulse" style={{ padding: "14px 0", textAlign: "center", fontSize: "12px", color: "var(--text-muted)" }}>
+              Loading more works…
+            </div>
+          )}
         </div>
       </div>
     </div>

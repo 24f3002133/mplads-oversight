@@ -167,6 +167,25 @@ export default function Contractors() {
           </tbody>
         </table>
       </div>
+      {v.contractorsShowPagination && (
+        <>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+          <button onClick={v.contractorsPrevPage} style={{ border: "1px solid var(--border-color)", background: "var(--card-bg)", borderRadius: "6px", padding: "6px 12px", fontSize: "12.5px", cursor: "pointer", fontFamily: "inherit", color: "var(--text-primary)" }}>
+            Previous
+          </button>
+          {(v.contractorsPageNumbers ?? []).map((p, pIndex) => (
+            <React.Fragment key={pIndex}>
+              <button onClick={p.go} style={{ border: "1px solid var(--border-color)", borderRadius: "6px", padding: "6px 11px", fontSize: "12.5px", cursor: "pointer", fontFamily: "inherit", background: p.bg, color: p.color }}>
+                {p.n}
+              </button>
+            </React.Fragment>
+          ))}
+          <button onClick={v.contractorsNextPage} style={{ border: "1px solid var(--border-color)", background: "var(--card-bg)", borderRadius: "6px", padding: "6px 12px", fontSize: "12.5px", cursor: "pointer", fontFamily: "inherit", color: "var(--text-primary)" }}>
+            Next
+          </button>
+        </div>
+        </>
+      )}
     </div>
     </>
   );

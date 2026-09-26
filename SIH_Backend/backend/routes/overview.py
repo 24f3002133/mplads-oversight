@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Query
 import risk
 from db import get_cursor
 from schema import (
-    LiveStatus, WorkKPIs, CheckTypeBreakdown, RankedStatesResponse, StateDetail,
+    LiveStatus, WorkKPIs, CheckTypeBreakdown, RankedStatesResponse, StateDetail, LiveEventsResponse,
 )
 
 router = APIRouter()
@@ -17,6 +17,32 @@ def get_live_status():
         last_synced_at=last_synced.isoformat() if last_synced else "",
         works_count=snap["kpis"]["works_monitored"],
         is_live=last_synced is not None,
+    )
+
+
+@router.get("/live-events", response_model=LiveEventsResponse)
+def live_events(limit: int = Query(8, le=50)):
+    with get_cursor() as cur:
+        cur.execute(
+            """SELECT wh.work_id, pd.state, wh.field_changed, wh.old_value, wh.new_value, wh.detected_at
+               FROM work_history wh
+               LEFT JOIN project_directory pd ON pd.work_id = wh.work_id
+               ORDER BY wh.detected_at DESC
+               LIMIT %s""",
+            (limit,),
+        )
+        rows = cur.fetchall()
+
+        cur.execute("SELECT count(*) AS n FROM work_history WHERE detected_at::date = CURRENT_DATE")
+        events_today = cur.fetchone()["n"]
+
+        cur.execute("SELECT max(detected_at) AS last FROM work_history")
+        last_synced = cur.fetchone()["last"]
+
+    return LiveEventsResponse(
+        events=[{**r, "detected_at": r["detected_at"].isoformat()} for r in rows],
+        events_today=events_today,
+        last_synced_at=last_synced.isoformat() if last_synced else "",
     )
 
 
@@ -36,7 +62,7 @@ def ranked_states():
     return RankedStatesResponse(states=states, total_states=len(states))
 
 @router.get("/state_map/{state}", response_model=StateDetail)
-def state_map(state: str, limit: int = Query(20, le=100)):
+def state_map(state: str, limit: int = Query(20, le=5000), offset: int = 0):
     with get_cursor() as cur:
         cur.execute(risk.SCORED_TABLE)
         cur.execute(
@@ -56,8 +82,8 @@ def state_map(state: str, limit: int = Query(20, le=100)):
                        sanction_amount, recommended_date, sanctioned_date, risk_score,
                        {', '.join(risk.CHECK_WEIGHTS)}
                 FROM scored WHERE state = %s
-                ORDER BY risk_score DESC, work_id LIMIT %s""",
-            (state, limit),
+                ORDER BY risk_score DESC, work_id LIMIT %s OFFSET %s""",
+            (state, limit, offset),
         )
         rows = cur.fetchall()
 

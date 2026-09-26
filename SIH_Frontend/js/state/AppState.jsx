@@ -31,9 +31,34 @@ import {
   REG_DISTRICTS,
   MOCK_EMAILS,
 } from '../data/mock.js';
-import { fetchOverview, fetchWorks, fetchStateDetail, fetchDossier, CHECK_LABELS, WORK_STATUSES } from '../api.js';
+import { fetchOverview, fetchWorks, fetchStateDetail, fetchDossier, fetchContractors, fetchLiveEvents, CHECK_LABELS, WORK_STATUSES } from '../api.js';
 
 const ALLWORKS_PAGE_SIZE = 14;
+const CONTRACTORS_PAGE_SIZE = 50;
+const STATE_MODAL_PAGE = 20;
+const STATE_MODAL_MAX = 5000;
+const LIVE_EVENTS_POLL_MS = 60000;
+const LIVE_EVENTS_ROTATE_MS = 6000;
+
+// Builds a plain-language line from a real work_history row — no invented events.
+function liveEventText(e) {
+  const loc = e.state ? ` (${e.state})` : '';
+  const field = e.field_changed.replace(/_/g, ' ');
+  if (e.field_changed === 'status') return `Work ${e.work_id}${loc} — status changed from "${e.old_value ?? 'NA'}" to "${e.new_value}"`;
+  if (/amount$/.test(e.field_changed) && e.new_value) return `Work ${e.work_id}${loc} — ${field} set to ${money(Number(e.new_value))}`;
+  return `Work ${e.work_id}${loc} — ${field} updated to ${e.new_value ?? '—'}`;
+}
+
+function relativeTimeFrom(iso) {
+  if (!iso) return '—';
+  const diffSec = Math.max(0, Math.round((Date.now() - new Date(iso).getTime())/1000));
+  if (diffSec < 60) return 'just now';
+  const mins = Math.round(diffSec/60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins/60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours/24)}d ago`;
+}
 const CHECK_KEY_BY_LABEL = Object.fromEntries(
   Object.entries(CHECK_LABELS).map(([key, label]) => [label, key]),
 );
@@ -53,7 +78,7 @@ export default class AppState extends React.Component {
     settingsEmailDigest: true, settingsEmailFrequency: 'weekly', settingsDesktopAlerts: true,
     settingsNotifyCritical: true, settingsNotifyHigh: true, settingsNotifyMedium: false,
     settingsIncludeAnnexures: true,
-    paletteOpen: false, paletteQuery: '',
+    paletteOpen: false, paletteQuery: '', glossaryOpen: false,
     copilotOpen: false, copilotMessages: [], copilotDraft: '', listening: false,
     tickerSeconds: 0,
     overviewSortKey: 'flagged',
@@ -65,9 +90,13 @@ export default class AppState extends React.Component {
     loginError: null, regToastMsg: null,
     overviewLive: null,
     allworksState: ALL, worksLive: null, stateDetail: null,
+    stateModalWorks: [], stateModalOffset: 0, stateModalLoadingMore: false, stateModalDone: false,
+    contractorsLive: null, contractorsSummary: null, contractorsPage: 1,
+    liveEvents: null, liveEventIndex: 0,
   };
 
   _worksKey = null;
+  _contractorsKey = null;
 
   _loadWorks() {
     const s = this.state;
@@ -86,11 +115,43 @@ export default class AppState extends React.Component {
       .catch(() => {});
   }
 
+  _loadContractors() {
+    const s = this.state;
+    const key = String(s.contractorsPage);
+    if (key === this._contractorsKey) return;
+    this._contractorsKey = key;
+    fetchContractors({limit: CONTRACTORS_PAGE_SIZE, offset: (s.contractorsPage-1)*CONTRACTORS_PAGE_SIZE})
+      .then((resp) => {
+        if (key !== this._contractorsKey) return;
+        this.setState({
+          contractorsLive: resp.contractors,
+          contractorsSummary: {
+            total: resp.total_contractors, highRisk: resp.high_risk_count,
+            avgCompletionRate: resp.avg_completion_rate, totalIdleFund: resp.total_idle_fund,
+          },
+        });
+      })
+      .catch(() => {});  // API down: contractors falls back to mock.js
+  }
+
+  _loadLiveEvents = () => {
+    fetchLiveEvents()
+      .then((liveEvents) => this.setState({liveEvents, liveEventIndex:0}))
+      .catch(() => {});  // API down: ticker shows the mock LIVE_EVENTS instead
+  };
+
   componentDidMount() {
     fetchOverview()
       .then((overviewLive) => this.setState({overviewLive}))
       .catch(() => {});  // API down: the overview falls back to mock.js
+    this._loadContractors();
     this._loadWorks();
+    this._loadLiveEvents();
+    this._liveEventsPoll = setInterval(this._loadLiveEvents, LIVE_EVENTS_POLL_MS);
+    this._liveEventsRotate = setInterval(() => this.setState((s) => {
+      const n = s.liveEvents ? s.liveEvents.events.length : 0;
+      return n>1 ? {liveEventIndex:(s.liveEventIndex+1)%n} : null;
+    }), LIVE_EVENTS_ROTATE_MS);
     this.syncTheme(this._vals ?? {});
     if (this.state.route === 'app') this._loadIndiaMap();
     try {
@@ -111,13 +172,41 @@ export default class AppState extends React.Component {
     this.syncTheme(this._vals ?? {});
     if (this.state.route === 'app') this._loadIndiaMap();
     this._loadWorks();
+    this._loadContractors();
   }
 
   componentWillUnmount() {
     clearInterval(this._tickClock);
+    clearInterval(this._liveEventsPoll);
+    clearInterval(this._liveEventsRotate);
     document.removeEventListener('keydown', this._onKeyDown);
     if (this._noteTimer) clearTimeout(this._noteTimer);
   }
+
+  setContractorsPage = (n) => () => this.setState({contractorsPage:n});
+
+  _loadStateWorks = (name, reset) => {
+    const offset = reset ? 0 : this.state.stateModalOffset;
+    this.setState({stateModalLoadingMore:true});
+    fetchStateDetail(name, {limit: STATE_MODAL_PAGE, offset})
+      .then((detail) => {
+        if (this.state.districtModalStateId !== name) return;
+        this.setState((s) => ({
+          stateDetail: detail,
+          stateModalWorks: reset ? detail.works : [...s.stateModalWorks, ...detail.works],
+          stateModalOffset: offset + detail.works.length,
+          stateModalDone: detail.works.length < STATE_MODAL_PAGE || offset+detail.works.length >= STATE_MODAL_MAX,
+          stateModalLoadingMore: false,
+        }));
+      })
+      .catch(() => this.setState({stateModalLoadingMore:false}));
+  };
+  onDistrictScroll = (e) => {
+    const s = this.state;
+    if (s.stateModalLoadingMore || s.stateModalDone || !s.districtModalStateId) return;
+    const el = e.target;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 150) this._loadStateWorks(s.districtModalStateId, false);
+  };
 
   doLogin = (session) => {
     this.setState({ session, route:'app', screen:'overview' });
@@ -187,6 +276,8 @@ export default class AppState extends React.Component {
 
   openPalette = () => this.setState({paletteOpen:true, paletteQuery:''});
   closePalette = () => this.setState({paletteOpen:false});
+  openGlossary = () => this.setState({glossaryOpen:true});
+  closeGlossary = () => this.setState({glossaryOpen:false});
   stopProp = (e) => e.stopPropagation();
   setPaletteQuery = (e) => this.setState({paletteQuery:e.target.value});
   paletteGotoScreen = (screen) => () => this.setState({paletteOpen:false, screen});
@@ -227,12 +318,10 @@ export default class AppState extends React.Component {
   });
 
   openDistrictModal = (id) => () => this.setState({districtModalStateId:id});
-  closeDistrictModal = () => this.setState({districtModalStateId:null, stateDetail:null});
+  closeDistrictModal = () => this.setState({districtModalStateId:null, stateDetail:null, stateModalWorks:[], stateModalOffset:0, stateModalDone:false});
   openStateModal = (name) => () => {
-    this.setState({districtModalStateId:name, stateDetail:null});
-    fetchStateDetail(name)
-      .then((stateDetail) => { if (this.state.districtModalStateId === name) this.setState({stateDetail}); })
-      .catch(() => {});
+    this.setState({districtModalStateId:name, stateDetail:null, stateModalWorks:[], stateModalOffset:0, stateModalDone:false});
+    this._loadStateWorks(name, true);
   };
   setOverviewSort = (key) => () => this.setState({overviewSortKey:key});
 
@@ -669,7 +758,11 @@ export default class AppState extends React.Component {
         timeline: trackTimeline(w.id), open: this.openWorkModal(w.id), untrack: this.toggleTrack(w.id) };
     });
 
-    const contractorRanked = AGENCIES.map((name) => {
+    const cl = s.contractorsLive;
+    const contractorRanked = cl ? cl.map((c) => ({
+      name: c.contractor_agency, total: c.total_work, flaggedCount: c.flagged,
+      completionRate: Math.round(c.completion_rate), avgRisk: Math.round(c.avg_risk), idleFunds: c.idle_fund,
+    })) : AGENCIES.map((name) => {
       const works = WORKS.filter((w) => w.agency===name);
       const total = works.length;
       const flaggedCount = works.filter((w) => FLAGGED_STATUSES.includes(w.status)).length;
@@ -678,14 +771,27 @@ export default class AppState extends React.Component {
       const idle = AGENCY_IDLE.find((a) => a.name===name);
       return { name, total, flaggedCount, completionRate: total ? Math.round((completedCount/total)*100) : 0, avgRisk, idleFunds: idle.idleFunds };
     }).sort((a,b) => b.avgRisk-a.avgRisk);
+    // Live: totals come from the server over the whole dataset, so they stay fixed
+    // across pages. Mock: no server totals exist, so derive from the full mock list.
+    const cs = s.contractorsSummary;
+    const contractorsTotalPages = cs ? Math.max(1, Math.ceil(cs.total/CONTRACTORS_PAGE_SIZE)) : 1;
+    const contractorsPageClamped = Math.min(s.contractorsPage, contractorsTotalPages);
+    const contractorsRankOffset = cl ? (contractorsPageClamped-1)*CONTRACTORS_PAGE_SIZE : 0;
     const contractorRows = contractorRanked.map((c, i) => {
       const band = riskBand(c.avgRisk);
-      return { rank:i+1, name:c.name, total:c.total, flaggedCount:c.flaggedCount, completionRate:c.completionRate,
+      return { rank:contractorsRankOffset+i+1, name:c.name, total:c.total, flaggedCount:c.flaggedCount, completionRate:c.completionRate,
         riskBg: RISK_WASH[band], riskColor: RISK_COLORS[band], riskLabel:`${c.avgRisk} · ${RISK_LABEL[band]}`,
         idleFunds: money(c.idleFunds) };
     });
-    const contractorStats = [
-      {label:'Contractors tracked', value: AGENCIES.length.toLocaleString('en-IN'), color:T.text},
+    const contractorsPrevPage = () => this.setState({contractorsPage: Math.max(1, contractorsPageClamped-1)});
+    const contractorsNextPage = () => this.setState({contractorsPage: Math.min(contractorsTotalPages, contractorsPageClamped+1)});
+    const contractorStats = (cl && cs) ? [
+      {label:'Contractors tracked', value: cs.total.toLocaleString('en-IN'), color:T.text},
+      {label:'High-risk (avg. ≥75)', value: cs.highRisk.toLocaleString('en-IN'), color:HIGH},
+      {label:'Avg. completion rate', value:`${Math.round(cs.avgCompletionRate)}%`, color:T.text},
+      {label:'Total idle funds', value: money(cs.totalIdleFund), color:MED},
+    ] : [
+      {label:'Contractors tracked', value: contractorRanked.length.toLocaleString('en-IN'), color:T.text},
       {label:'High-risk (avg. ≥75)', value: contractorRanked.filter((c) => c.avgRisk>=75).length.toLocaleString('en-IN'), color:HIGH},
       {label:'Avg. completion rate', value:`${Math.round(contractorRanked.reduce((a,c) => a+c.completionRate,0)/contractorRanked.length)}%`, color:T.text},
       {label:'Total idle funds', value: money(contractorRanked.reduce((a,c) => a+c.idleFunds,0)), color:MED},
@@ -810,6 +916,11 @@ export default class AppState extends React.Component {
       lastSyncedLabel: live && live.lastSyncedAt
         ? new Date(live.lastSyncedAt).toLocaleString('en-IN', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})
         : '—',
+      liveTickerText: s.liveEvents && s.liveEvents.events.length
+        ? liveEventText(s.liveEvents.events[s.liveEventIndex % s.liveEvents.events.length])
+        : 'No changes detected yet — waiting for the next sync.',
+      liveTickerCount: s.liveEvents ? s.liveEvents.events_today : 0,
+      liveTickerSyncedLabel: s.liveEvents ? relativeTimeFrom(s.liveEvents.last_synced_at) : '—',
       canSwitchScope, showScopedBadge: !canSwitchScope,
       scopeChipDistrict: s.settingsDistrict, scopeChipState: s.settingsState,
       districtOptions: DISTRICT_OPTIONS, settingsStateOptions: STATES.map((x) => x.name),
@@ -854,6 +965,9 @@ export default class AppState extends React.Component {
       fundflowStats, fundflowReleasedAreaPath, fundflowUtilisedAreaPath, fundflowReleasedEnd, fundflowUtilisedEnd, fundflowReleasedPoints, fundflowUtilisedPoints, fundflowReleasedDots, fundflowUtilisedDots, fundflowLabels, gridLines, leakageAgencies, agencyRows,
       trackerRows, trackerHasRows: trackerRows.length>0, trackerNoRows: trackerRows.length===0,
       contractorRows, contractorStats,
+      contractorsShowPagination: contractorsTotalPages>1,
+      contractorsPageNumbers: pageNumbers(contractorsTotalPages, contractorsPageClamped, this.setContractorsPage),
+      contractorsPrevPage, contractorsNextPage,
       queueStats, queueTab: s.queueTab, isQueueAwaiting: s.queueTab==='awaiting', isQueueResolved: s.queueTab==='resolved',
       setQueueAwaiting: this.setQueueAwaiting, setQueueResolved: this.setQueueResolved,
       queueAwaitingBorder: s.queueTab==='awaiting'?PRI:'transparent', queueAwaitingColor: s.queueTab==='awaiting'?T.text:T.textMuted,
@@ -870,6 +984,8 @@ export default class AppState extends React.Component {
       copilotDraft: s.copilotDraft, setCopilotDraft: this.setCopilotDraft, copilotKeyDown: this.copilotKeyDown, sendCopilotMessage: this.sendCopilotMessage,
       toggleListening: this.toggleListening, listenBg: s.listening?PRI:T.card, listenColor: s.listening?'#fff':T.text, listenBorder: s.listening?PRI:T.border,
       districtModalOpen: !!s.districtModalStateId, closeDistrictModal: this.closeDistrictModal,
+      glossaryOpen: s.glossaryOpen, openGlossary: this.openGlossary, closeGlossary: this.closeGlossary,
+      onDistrictScroll: this.onDistrictScroll, districtModalLoadingMore: s.stateModalLoadingMore,
       districtModalState: (() => {
         if (live) {
           const sd = s.stateDetail;
@@ -881,9 +997,7 @@ export default class AppState extends React.Component {
       })(),
       districtModalWorks: (() => {
         if (live) {
-          const sd = s.stateDetail;
-          if (!sd) return [];
-          return sd.works.map((w) => { const band = riskBand(w.risk_score); return { title:w.description, sub:`${w.work_id} · ${w.constituency ?? ''} · ${money(w.sanction_amount ?? 0)}`, riskBg:RISK_WASH[band], riskColor:RISK_COLORS[band], riskLabel:`${w.risk_score}`, open: this.openWorkModal(w.work_id) }; });
+          return (s.stateModalWorks||[]).map((w) => { const band = riskBand(w.risk_score); return { title:w.description, sub:`${w.work_id} · ${w.constituency ?? ''} · ${money(w.sanction_amount ?? 0)}`, riskBg:RISK_WASH[band], riskColor:RISK_COLORS[band], riskLabel:`${w.risk_score}`, open: this.openWorkModal(w.work_id) }; });
         }
         const st = STATES.find((x) => x.id===s.districtModalStateId);
         if (!st) return [];

@@ -1,10 +1,12 @@
 from mp_names import json_api_lok_sabha, json_api_rajya_sabha
-from project_report import lok_sabha_project, rajya_sabha_project
+from project_report import lok_sabha_project, rajya_sabha_project, lok_sabha_expenditure, rajya_sabha_expenditure
 import asyncio
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
+import time
 from dotenv import load_dotenv
+import argparse
 
 load_dotenv()
 
@@ -22,6 +24,9 @@ WORK_EXISTS = "SELECT * FROM project_directory WHERE work_id = %s"
 WORK_UPDATE = "UPDATE project_directory SET mp_name=%s, constituency=%s, state=%s, description=%s, category=%s, activity_name=%s, ida_name=%s, status=%s, recommended_amount=%s, sanction_amount=%s, actual_completion_amount=%s, recommended_date=%s, sanctioned_date=%s, completion_date=%s WHERE work_id=%s"
 WORK_INSERT = "INSERT INTO project_directory (work_id, mp_name, constituency, state, description, category, activity_name, ida_name, status, recommended_amount, sanction_amount, actual_completion_amount, recommended_date, sanctioned_date, completion_date) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
 HISTORY_INSERT = "INSERT INTO work_history (work_id, field_changed, old_value, new_value) VALUES (%s,%s,%s,%s)"
+
+VENDOR_EXISTS = "SELECT id FROM vendor_payments WHERE work_id=%s AND vendor_id=%s AND expenditure_date=%s AND fund_disbursed_amt=%s"
+VENDOR_INSERT = "INSERT INTO vendor_payments (work_id, vendor_id, vendor_name, ia_name, fund_disbursed_amt, expenditure_date, payment_status) VALUES (%s,%s,%s,%s,%s,%s,%s)"
 
 TRACKED_FIELDS = ["status", "sanction_amount", "recommended_amount", "actual_completion_amount", "sanctioned_date", "completion_date"]
 
@@ -133,7 +138,56 @@ async def mp_project_data():
     cur.close()
     conn.close()
 
+async def vendor_payments():
+    # fetch with retries; only push to the db once both houses come back clean
+    all_payments = None
+    for attempt in range(3):
+        try:
+            payments_loksabha = lok_sabha_expenditure()
+            payments_rajyasabha = rajya_sabha_expenditure()
+            all_payments = (payments_loksabha or []) + (payments_rajyasabha or [])
+            break
+        except Exception:
+            if attempt == 2:
+                return
+            time.sleep(3)
+
+    # normalise
+    rows = []
+    for w in all_payments:
+        wid = str(w.get("WORK_RECOMMENDATION_DTL_ID", "")).strip()
+        if not wid: continue
+        rows.append({
+            "work_id": wid,
+            "vendor_id": w.get("VENDOR_ID"),
+            "vendor_name": (w.get("VENDOR_NAME") or "").strip(),
+            "ia_name": w.get("IA_NAME"),
+            "fund_disbursed_amt": w.get("FUND_DISBURSED_AMT"),
+            "expenditure_date": clean_date(w.get("EXPENDITURE_DATE")),
+            "payment_status": w.get("WORK_STATUS"),
+        })
+
+    # push to db, skipping payments already recorded
+    conn = get_db()
+    cur = conn.cursor()
+    for r in rows:
+        cur.execute(VENDOR_EXISTS, (r["work_id"], r["vendor_id"], r["expenditure_date"], r["fund_disbursed_amt"]))
+        if not cur.fetchone():
+            cur.execute(VENDOR_INSERT, (
+                r["work_id"], r["vendor_id"], r["vendor_name"], r["ia_name"],
+                r["fund_disbursed_amt"], r["expenditure_date"], r["payment_status"]
+            ))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+async def news_data():
+    return
+
 
 if __name__ == "__main__":
+    # parser = argparse.ArgumentParser()
     asyncio.run(mp_names())
     asyncio.run(mp_project_data())
+    asyncio.run(vendor_payments())

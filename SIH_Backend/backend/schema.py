@@ -43,6 +43,21 @@ class LiveStatus(BaseModel):
     data_source: str = "eSAKSHI"
     works_count: int
     is_live: bool
+
+
+class LiveEvent(BaseModel):
+    work_id: str
+    state: Optional[str]
+    field_changed: str
+    old_value: Optional[str]
+    new_value: Optional[str]
+    detected_at: str
+
+
+class LiveEventsResponse(BaseModel):
+    events: list[LiveEvent]
+    events_today: int
+    last_synced_at: str
  
  
 class WorkKPIs(BaseModel):
@@ -148,4 +163,20 @@ class DossierResponse(BaseModel):
     cost_outlier: Optional[CostOutlierInfo]
     duplicate_matches: list[DuplicateMatch]
 
- 
+
+class Contractor(BaseModel):
+    vendor_id:int
+    contractor_agency:str
+    total_work:int
+    flagged:int
+    completion_rate:float
+    avg_risk:float
+    idle_fund:float
+
+
+class ContractorsResponse(BaseModel):
+    total_contractors:int
+    high_risk_count:int
+    avg_completion_rate:float
+    total_idle_fund:float
+    contractors:list[Contractor]

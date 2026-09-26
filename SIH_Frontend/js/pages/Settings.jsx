@@ -241,13 +241,18 @@ export default function Settings() {
           </div>
         </section>
         <section style={{ gridColumn: "1 / -1", border: "1px solid var(--border-color)", background: "var(--card-bg)", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 2px rgba(19,26,34,0.05)", display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div>
-            <h2 style={{ fontFamily: "'Source Serif 4',serif", fontSize: "16.5px", fontWeight: "700", letterSpacing: "-0.01em", margin: "0", color: "var(--heading-color)" }}>
-              Risk &amp; alert thresholds
-            </h2>
-            <p style={{ margin: "4px 0 0", color: "var(--text-muted)", fontSize: "12px" }}>
-              Controls when a work or agency gets flagged across Overview, Tracker and the PFMS leakage detector.
-            </p>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
+            <div>
+              <h2 style={{ fontFamily: "'Source Serif 4',serif", fontSize: "16.5px", fontWeight: "700", letterSpacing: "-0.01em", margin: "0", color: "var(--heading-color)" }}>
+                Risk &amp; alert thresholds
+              </h2>
+              <p style={{ margin: "4px 0 0", color: "var(--text-muted)", fontSize: "12px" }}>
+                Controls when a work or agency gets flagged across Overview, Tracker and the PFMS leakage detector.
+              </p>
+            </div>
+            <button onClick={v.openGlossary} style={{ flexShrink: "0", border: "1px solid var(--border-color)", background: "var(--surface-muted)", borderRadius: "6px", padding: "7px 12px", fontSize: "12.5px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit", color: "var(--text-primary)" }}>
+              Glossary
+            </button>
           </div>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
             <div>

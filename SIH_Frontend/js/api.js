@@ -64,10 +64,18 @@ export async function fetchWorks({ state, status, checkType, query, page, pageSi
   return get(`/works/project_data?${p}`);
 }
 
-export async function fetchStateDetail(state) {
-  return get(`/overview/state_map/${encodeURIComponent(state)}`);
+export async function fetchStateDetail(state, { limit = 20, offset = 0 } = {}) {
+  return get(`/overview/state_map/${encodeURIComponent(state)}?limit=${limit}&offset=${offset}`);
 }
 
 export async function fetchDossier(workId) {
   return get(`/dossier/${encodeURIComponent(workId)}`);
+}
+
+export async function fetchContractors({ limit = 50, offset = 0 } = {}) {
+  return get(`/contractors/?limit=${limit}&offset=${offset}`);
+}
+
+export async function fetchLiveEvents({ limit = 8 } = {}) {
+  return get(`/overview/live-events?limit=${limit}`);
 }
